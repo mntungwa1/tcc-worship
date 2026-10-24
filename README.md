@@ -85,3 +85,8 @@ See `VALIDATION.md` for checks performed on this release. Run a full rehearsal w
 - OpenLP: https://openlp.org/
 - Streamlit architecture: https://docs.streamlit.io/develop/concepts/architecture/architecture
 - See `THIRD_PARTY_NOTICES.md` for Bible data provenance and dependency licences.
+
+### Twelve selected free Bible versions
+Open **Bible desk → Browse 12 free Bible versions** to add BSB, KJV, WEB, ASV, BBE, FBV, Darby, YLT, Revised Version, Webster, Geneva 1599 or LSV. WEB is already included. Additional versions download on demand; internet is required for that download. Select an added translation in the Bible version dropdown.
+
+Use **Download selected Bible JSON** to retain a version across sessions and re-import it under Settings & backups. Added versions are included in offline presentation exports. The workspace backup still saves the service/library rather than entire Bible datasets. Source attribution and licence notices accompany added translations. The catalogue is a curated selection, not every free translation worldwide.
