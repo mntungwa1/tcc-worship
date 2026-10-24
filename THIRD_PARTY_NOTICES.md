@@ -18,3 +18,11 @@ Holyrics, FreeShow, Quelea and OpenLP are referenced as workflow inspirations or
 The source snapshot has empty text entries at Luke 17:36, Acts 8:37, Acts 15:34, Acts 24:7, Romans 16:25. These empty entries are not selectable. No replacement scripture has been invented.
 
 The supplied TCC logo is church artwork supplied by the user, included as provided. The project software licence does not grant rights to reuse the church logo or identity.
+
+## Curated Bible catalogue — 24 October 2026
+
+The optional catalogue uses AO Lab's Free Use Bible API: https://bible.helloao.org/ and its per-translation permissions metadata and links. Selected IDs: BSB, eng_kjv, eng_web, eng_asv, eng_bbe, eng_fbv, eng_dby, eng_ylt, eng_rv5, eng_wbs, eng_gnv, eng_lsv.
+
+The source marks ten selected editions public domain. KJV printing rights in the United Kingdom remain subject to Crown Letters Patent; that notice is retained. Free Bible Version (Copyright © 2018 Dr. Jonathan Gallagher) and Literal Standard Version (Copyright © 2020 Covenant Press) are distributed under CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/. For those editions the app retrieves and retains source copyright/licence notices, carries attribution into prepared scripture items and embeds the notices with Bible data in offline exports. Verse wording is not rewritten; formatting, commentary and study annotations are not represented as verse text.
+
+Publisher references: https://ebible.org/Scriptures/details.php?id=engfbv and https://ebible.org/Scriptures/details.php?id=englsv. Catalogue snapshot metadata is retained under data/bible_catalogue.json.gz.b64. Bible texts are downloaded only when selected; the existing WEB remains available offline.
