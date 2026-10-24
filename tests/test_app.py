@@ -37,3 +37,20 @@ def test_bible_navigation_and_passage_queue():
     assert obj['kind']=='scripture'
     assert len(obj['slides'])==3
     assert 'John 3:16' in obj['slides'][0]['text']
+
+
+def test_live_desk_snapshot_changes_only_when_refreshed():
+    at=AppTest.from_file(APP,default_timeout=30).run()
+    next(x for x in at.radio if x.label=='Workspace').set_value('Presentation desk').run()
+    assert not at.exception
+    original=at.session_state.live_desk_html
+    assert 'CONGREGATION · LIVE OUTPUT' in original
+    assert 'id="preview"' in original and 'id="live"' in original
+    at.session_state.workspace['service_title']='Updated service title'
+    at.run()
+    assert at.session_state.live_desk_html==original
+    assert any('have changed' in x.value for x in at.info)
+    next(x for x in at.button if x.label=='Load / refresh live desk').click().run()
+    assert not at.exception
+    assert at.session_state.live_desk_html!=original
+    assert 'Updated service title' in at.session_state.live_desk_html
