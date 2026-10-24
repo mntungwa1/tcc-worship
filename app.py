@@ -9,7 +9,13 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 from core import (new_workspace, item, duplicate, slides_from_text, search_items, presentation_item,
-                  backup_bytes, load_backup, media_data, export_html, MAX_BACKUP, FONT_FAMILIES)
+                  backup_bytes, load_backup, media_data, export_html, MAX_BACKUP)
+import core as worship_core
+
+# Streamlit may retain the previous core module during a hot deployment.
+FONT_FAMILIES = getattr(worship_core, 'FONT_FAMILIES', (
+    'Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia',
+    'Times New Roman', 'Courier New', 'sans-serif', 'serif'))
 from bible import BOOKS, load_bible, validate_bible, parse_reference, passage_item
 from song_import import load_bundled_songs, fingerprint
 from saved_services import controls as saved_service_controls, restore_project
