@@ -52,12 +52,9 @@ def secret(name, default=''):
     except Exception: return os.getenv(name, default)
 
 password = secret('APP_PASSWORD')
-# Accept the existing Armoede-style Secrets configuration.
-if not isinstance(password, str) or not password.strip():
-    password = secret('SURVEY_PASSWORD')
 if not isinstance(password, str) or not password.strip():
     st.title('TCC Worship')
-    st.error('Password protection is required. Set APP_PASSWORD or SURVEY_PASSWORD in Streamlit Secrets, then restart the app.')
+    st.error('Password protection is required. Set APP_PASSWORD in Streamlit Secrets, then restart the app.')
     st.stop()
 if st.session_state.get('authenticated'):
     st.session_state.pop('church_login_password',None)
