@@ -89,7 +89,8 @@ def controls(workspace,bibles,prefix):
             st.session_state.saved_service_id=result.get('id')
             st.session_state.saved_service_name=result.get('name')
             st.session_state.saved_service_revision=result.get('revision')
-            st.success('Saved '+str(result.get('name'))+' in this browser.')
+            st.session_state.notice='Saved '+str(result.get('name'))+' in this browser.'
+            st.rerun()
     with st.expander('Open a downloaded service file'):
         file=st.file_uploader('Choose a TCC service file',type=['tccworship','json','gz'],key=prefix+'_service_file')
         if st.button('Open service file',disabled=file is None,key=prefix+'_service_file_open'):
