@@ -8,7 +8,7 @@ from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
-from core import (new_workspace, item, duplicate, slides_from_text, search_items,
+from core import (new_workspace, item, duplicate, slides_from_text, search_items, presentation_item,
                   backup_bytes, load_backup, media_data, export_html, MAX_BACKUP)
 from bible import BOOKS, load_bible, validate_bible, parse_reference, passage_item
 from song_import import load_bundled_songs, fingerprint
@@ -87,6 +87,10 @@ def queue(obj):
     notify('Added to the service.')
 
 def preview(obj, slide=0, height=260):
+    if obj['kind']=='song':
+        obj=presentation_item(obj)
+        slide=min(slide,len(obj['slides'])-1)
+        st.caption(f"{obj['slides'][slide]['label']} · Slide {slide+1} of {len(obj['slides'])}")
     if obj['kind']=='video':st.video(obj['src']);return
     if obj['kind']=='image':st.image(obj['src']);return
     s=obj['slides'][slide]
@@ -333,7 +337,7 @@ elif page=='Service planner':
         with st.container(border=True):
             a,b,c,d=st.columns([8,1,1,1])
             a.write(f"**{n+1:02}. {obj['title']}**")
-            a.caption(f"{obj['kind'].title()} · {max(1,len(obj['slides']))} slides")
+            a.caption(f"{obj['kind'].title()} · {max(1,len(presentation_item(obj)['slides']))} slides")
             if b.button('↑',key='up'+obj['id'],disabled=n==0):w['service'][n-1],w['service'][n]=w['service'][n],w['service'][n-1];st.rerun()
             if c.button('↓',key='down'+obj['id'],disabled=n==len(w['service'])-1):w['service'][n+1],w['service'][n]=w['service'][n],w['service'][n+1];st.rerun()
             if d.button('✕',key='remove'+obj['id']):w['service'].pop(n);st.rerun()
@@ -378,10 +382,10 @@ elif page=='Presentation desk':
     st.caption('Click Open projector in the live desk to open a separate window. Move it to your extended second display, then click Full screen. Keep this desk open while presenting.')
     if w['service']:
         current_signature=json.dumps({'service':w['service'],'theme':w['theme'],'title':w['service_title'],'bibles':[b.get('id',b['name']) for b in st.session_state.bibles]},sort_keys=True)
-        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=2:
+        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=3:
             st.session_state.live_desk_html=export_html(w,st.session_state.bibles,output_session=st.session_state.presenter_session).decode('utf-8')
             st.session_state.live_desk_signature=current_signature
-            st.session_state.live_desk_version=2
+            st.session_state.live_desk_version=3
         if st.session_state.get('live_desk_signature')!=current_signature:
             st.info('Your service or Bible versions have changed. Click Load / refresh live desk when ready to use the updated service.')
         components.html(st.session_state.live_desk_html,height=1050,scrolling=True)
