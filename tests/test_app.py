@@ -69,6 +69,7 @@ def test_media_categories_recategorisation_background_and_queue(tmp_path,monkeyp
     asset['credit']='Test creator · CC0'
     next(x for x in at.radio if x.label=='Workspace').set_value('Media & presentations').run()
     assert not at.exception
+
     next(x for x in at.selectbox if x.key=='image_browse_category').set_value('Worship').run()
     assert not at.exception
     next(x for x in at.selectbox if x.key=='media_category_'+asset['id']).set_value('Prayer')
@@ -80,3 +81,47 @@ def test_media_categories_recategorisation_background_and_queue(tmp_path,monkeyp
     next(x for x in at.button if x.key=='media_queue_'+asset['id']).click().run()
     assert at.session_state.workspace['service'][-1]['src'].startswith('data:image/png;base64,')
     assert not at.exception
+
+
+def test_empty_background_category_keeps_file_picker_and_explorer_upload_visible():
+    at=AppTest.from_file(APP,default_timeout=30).run()
+    next(x for x in at.radio if x.label=='Workspace').set_value('Presentation desk').run()
+    next(x for x in at.radio if x.key=='live_bg_type').set_value('Video').run()
+    next(x for x in at.selectbox if x.key=='live_bg_category_Video').set_value('Sunday School').run()
+    chooser=next(x for x in at.selectbox if x.key=='live_bg_Video')
+    assert chooser.disabled
+    assert any('Browse your computer for video' in x.proto.label for x in at.get('file_uploader'))
+    assert any('Click Browse files below' in x.value for x in at.info)
+    assert next(x for x in at.button if x.key=='live_bg_apply').disabled
+    assert not at.exception
+
+
+def test_background_computer_upload_selects_file_then_applies(tmp_path,monkeypatch):
+    import io
+    import streamlit as st
+    from PIL import Image
+    monkeypatch.setenv('TCC_MEDIA_DIR',str(tmp_path/'media'))
+    raw=io.BytesIO();Image.new('RGB',(32,20),'green').save(raw,'PNG')
+    raw.seek(0);raw.name='Garden.png';raw.size=len(raw.getvalue())
+    original=st.file_uploader
+    def picker(label,*args,**kwargs):
+        if label.startswith('Browse your computer for image'):
+            return [raw] if kwargs['key'].endswith('_0') else []
+        return original(label,*args,**kwargs)
+    monkeypatch.setattr(st,'file_uploader',picker)
+    at=AppTest.from_file(APP,default_timeout=30).run()
+    next(x for x in at.radio if x.label=='Workspace').set_value('Presentation desk').run()
+    next(x for x in at.radio if x.key=='live_bg_type').set_value('Image').run()
+    next(x for x in at.selectbox if x.key=='live_bg_upload_category_Image').set_value('Sunday School').run()
+    assert any('Selected files to add' in x.value for x in at.markdown)
+    next(x for x in at.button if x.key=='live_bg_upload_add_Image').click().run()
+    assert not at.exception
+    asset=next(x for x in at.session_state.workspace['library'] if x['title']=='Garden')
+    assert asset['category']=='Sunday School'
+    assert next(x for x in at.selectbox if x.key=='live_bg_Image').value==asset['id']
+    assert next(x for x in at.selectbox if x.key=='live_bg_category_Image').value=='Sunday School'
+    assert not at.session_state.workspace['theme'].get('background_media')
+    next(x for x in at.button if x.key=='live_bg_apply').click().run()
+    assert not at.exception
+    assert at.session_state.workspace['theme']['background_media']['name']=='Garden'
+    assert at.session_state.workspace['theme']['background_media']['src'].startswith('data:image/png;base64,')

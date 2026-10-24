@@ -202,6 +202,7 @@ def import_uploads(workspace, uploads, kind, default_category='Welcome', use_fol
     added = restored = duplicates = ignored = 0
     writes = {}
     counts = {name: 0 for name in CATEGORIES}
+    asset_ids = []
 
     def accept(name, raw, row=None, structured=False):
         nonlocal added, restored, duplicates, ignored, total
@@ -213,6 +214,8 @@ def import_uploads(workspace, uploads, kind, default_category='Welcome', use_fol
         digest = hashlib.sha256(raw).hexdigest()
         previous = known.get((kind, digest))
         if previous:
+            if previous['id'] not in asset_ids:
+                asset_ids.append(previous['id'])
             src = previous.get('src', '')
             if is_cached_source(src) and not source_path(src).is_file() and src not in writes:
                 dest = source_path(src)
@@ -244,6 +247,7 @@ def import_uploads(workspace, uploads, kind, default_category='Welcome', use_fol
         writes[src] = (staged, target / (digest + suffix))
         known[(kind, digest)] = obj
         candidate['library'].append(obj)
+        asset_ids.append(obj['id'])
         counts[category] += 1
         added += 1
 
@@ -302,7 +306,7 @@ def import_uploads(workspace, uploads, kind, default_category='Welcome', use_fol
             os.replace(staged, dest)
         workspace['library'] = candidate['library']
         workspace['media_scope'] = scope
-        return {'added': added, 'restored': restored, 'duplicates': duplicates, 'ignored': ignored, 'categories': counts}
+        return {'added': added, 'restored': restored, 'duplicates': duplicates, 'ignored': ignored, 'categories': counts, 'asset_ids': asset_ids}
     finally:
         shutil.rmtree(stage, ignore_errors=True)
 

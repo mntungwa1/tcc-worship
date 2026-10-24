@@ -155,6 +155,11 @@ def set_background(asset,overlay=None):
 
 
 def background_controls(prefix):
+    pending=st.session_state.pop(prefix+'_pending_bg_choice',None)
+    if pending:
+        st.session_state[prefix+'_bg_type']=pending['mode']
+        st.session_state[prefix+'_bg_category_'+pending['mode']]=pending['category']
+        st.session_state[prefix+'_bg_'+pending['mode']]=pending['id']
     with st.expander('Image or video background'):
         current=w['theme'].get('background_media')
         options=['Solid colour','Image','Video']
@@ -162,15 +167,44 @@ def background_controls(prefix):
         mode=st.radio('Background type',options,index=default,horizontal=True,key=prefix+'_bg_type')
         chosen=None
         if mode!='Solid colour':
-            assets=[x for x in w['library'] if x['kind']==mode.lower()]
-            category=st.selectbox('Background category',['All categories',*CATEGORIES],key=prefix+'_bg_category_'+mode)
-            if category!='All categories':assets=[x for x in assets if asset_category(x)==category]
-            if assets:
-                ids=[x['id'] for x in assets]
-                default_id=current.get('library_id') if current and current['kind']==mode.lower() else None
-                selected=st.selectbox('Choose from your '+mode.lower()+' library',ids,index=ids.index(default_id) if default_id in ids else 0,format_func=lambda value:next(x['title'] for x in assets if x['id']==value),key=prefix+'_bg_'+mode)
-                chosen=next(x for x in assets if x['id']==selected)
-            else:st.info('Add files in Media & presentations → '+mode+' library first.')
+            kind=mode.lower()
+            all_assets=[x for x in w['library'] if x['kind']==kind]
+            counts={name:sum(asset_category(x)==name for x in all_assets) for name in CATEGORIES}
+            category=st.selectbox('Background category',['All categories',*CATEGORIES],format_func=lambda name:f"{name} ({len(all_assets) if name=='All categories' else counts[name]})",key=prefix+'_bg_category_'+mode)
+            assets=[x for x in all_assets if category=='All categories' or asset_category(x)==category]
+            ids=[x['id'] for x in assets]
+            default_id=current.get('library_id') if current and current['kind']==kind else None
+            selected=st.selectbox('Choose an '+kind+' file' if kind=='image' else 'Choose a video file',[None,*ids],index=ids.index(default_id)+1 if default_id in ids else 0,format_func=lambda value:('Select a file from the list' if ids else 'No files in this category yet') if value is None else next(x['title'] for x in assets if x['id']==value),disabled=not ids,key=prefix+'_bg_'+mode)
+            chosen=next((x for x in assets if x['id']==selected),None)
+            if chosen:
+                st.caption('Selected file: '+chosen['title'])
+                preview(chosen,height=220)
+            elif not assets:
+                if all_assets:
+                    st.info(f'No {kind} files in this category. Choose All categories to see your {len(all_assets)} uploaded files, or browse your computer below.')
+                else:
+                    st.info('No '+kind+' files uploaded yet. Click Browse files below to select files from your computer.')
+            st.markdown('**Add a background from your computer**')
+            st.caption('Click Browse files to open File Explorer. Select one or more files, or an Images.zip / Videos.zip collection, then click Add selected files below.')
+            upload_category=st.selectbox('Category for new files',CATEGORIES,index=CATEGORIES.index(category) if category in CATEGORIES else CATEGORIES.index('Welcome'),key=prefix+'_bg_upload_category_'+mode)
+            version=st.session_state.get(prefix+'_bg_upload_version_'+mode,0)
+            extensions=['png','jpg','jpeg','webp','gif','zip'] if kind=='image' else ['mp4','webm','zip']
+            uploads=st.file_uploader('Browse your computer for '+kind+' files or ZIP',type=extensions,accept_multiple_files=True,key=prefix+'_bg_upload_'+mode+'_'+str(version))
+            if uploads:
+                st.write('Selected files to add:')
+                st.dataframe([{'File':file.name,'Size (MB)':round(file.size/1024/1024,2)} for file in uploads],hide_index=True,width='stretch')
+            if st.button('Add selected files to background list',disabled=not uploads,key=prefix+'_bg_upload_add_'+mode):
+                try:
+                    with st.spinner('Adding your background files…'):
+                        result=import_uploads(w,uploads,kind,upload_category,True)
+                    if result['asset_ids']:
+                        first=next(x for x in w['library'] if x['id']==result['asset_ids'][0])
+                        st.session_state[prefix+'_pending_bg_choice']={'mode':mode,'category':asset_category(first),'id':first['id']}
+                        st.session_state[prefix+'_bg_upload_version_'+mode]=version+1
+                        st.session_state.pop(kind+'_prepared_archive',None)
+                        notify(f"Added {result['added']} new files; restored {result['restored']}. The first file is selected in the list. Click Apply background when ready.")
+                    else:st.warning('No matching '+kind+' files were found. Choose supported '+kind+' files or the matching media ZIP.')
+                except (ValueError,OSError) as exc:st.error(str(exc))
         darkening=st.slider('Darken background for readable lyrics (%)',0,90,int(w['theme'].get('background_overlay',0.45)*100),key=prefix+'_bg_dark')
         if st.button('Apply background',disabled=mode!='Solid colour' and chosen is None,key=prefix+'_bg_apply',type='primary'):
             try:
