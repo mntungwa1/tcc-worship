@@ -18,7 +18,8 @@ def test_create_song_search_and_queue():
     next(b for b in at.button if b.label=='Save to library').click().run()
     assert not at.exception
     next(x for x in at.text_input if x.label=='Search titles, lyrics and tags').set_value('Test hymn').run()
-    next(b for b in at.button if b.label=='Add to service').click().run()
+    song_id=next(x['id'] for x in at.session_state.workspace['library'] if x['title']=='Test hymn')
+    next(b for b in at.button if b.key=='add'+song_id).click().run()
     assert at.session_state.workspace['service'][-1]['title']=='Test hymn'
     assert len(at.session_state.workspace['service'][-1]['slides'])==2
 
