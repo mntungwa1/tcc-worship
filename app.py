@@ -15,6 +15,25 @@ from bible import BOOKS, load_bible, validate_bible, parse_reference, passage_it
 st.set_page_config(page_title='TCC Worship | Tabernacle Christian Centre', page_icon='✝', layout='wide')
 st.markdown('''<style>
 .block-container{padding-top:2rem}h1{letter-spacing:-.04em}div[data-testid="stMetric"]{background:#142039;border:1px solid #2c3a53;border-radius:12px;padding:14px}div[data-testid="stSidebar"]{border-right:1px solid #27354d}.eyebrow{color:#e8bc73;font-size:12px;letter-spacing:2px}.subtle{color:#a7b6cc}.stButton>button{border-radius:8px}.desk-title{font-size:22px;font-weight:650}.bible-label{font-size:12px;color:#e8bc73;letter-spacing:1px;margin-bottom:8px}
+
+/* Keep the first label clear of Streamlit's fixed toolbar. */
+.block-container{padding-top:6rem}
+div[data-testid="stMetric"]{color:#f4f6fb}
+div[data-testid="stMetric"] [data-testid="stMetricLabel"],
+div[data-testid="stMetric"] [data-testid="stMetricValue"],
+div[data-testid="stMetric"] p{color:#f4f6fb}
+div[data-testid="stMetricLabel"] p,
+div[data-testid="stWidgetLabel"] p,
+div[data-testid="stRadio"] label p,
+div[data-testid="stButton"] button p,
+div[data-testid="stDownloadButton"] button p,
+div[data-testid="stFormSubmitButton"] button p{
+    white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere
+}
+div[data-testid="stButton"] button,
+div[data-testid="stDownloadButton"] button,
+div[data-testid="stFormSubmitButton"] button{height:auto;min-height:2.5rem}
+.eyebrow{line-height:1.6;overflow-wrap:anywhere}
 </style>''', unsafe_allow_html=True)
 
 def secret(name, default=''):
