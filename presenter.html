@@ -15,14 +15,15 @@ nav{display:flex;gap:8px;padding:12px 28px;border-bottom:1px solid #283348}.bibl
 <header><img src="__TCC_LOGO__" alt="Tabernacle Christian Centre" style="width:150px;height:85px;object-fit:contain;background:white;border-radius:8px;margin-right:18px"><div style="flex:1"><small>TCC WORSHIP / PRESENTATION DESK</small><h1 id="title"></h1></div><button class="primary" id="open">Open projector ↗</button></header>
 <nav><button id="service-tab" class="active">Service desk</button><button id="bible-tab">Holy Bible</button></nav>
 <section class="bible-panel"><div class="bible-bar"><select id="bible-version" aria-label="Bible version"></select><input id="bible-ref" placeholder="Quick reference: John 3:16-18" aria-label="Quick reference"><button id="bible-find" class="primary">Find passage</button></div><div class="bible-desk"><section><h2 id="bible-heading"></h2><label><input id="multi-verse" type="checkbox"> Select multiple verses</label><div id="verse-list" class="verse-list"></div><div class="screen bible-preview" id="bible-preview"></div><div class="controls"><button id="bible-live" class="primary">Go live with passage</button><button id="bible-add">Add to service</button><button id="bible-prev">← Live previous</button><button id="bible-next">Live next →</button><button id="bible-blank">Blackout</button></div><p class="status" id="bible-status" aria-live="polite"></p></section><section><h3>BOOKS · OLD TESTAMENT / NEW TESTAMENT</h3><div id="bible-books" class="bible-grid books"></div><h3>CHAPTERS</h3><div id="bible-chapters" class="bible-grid numbers"></div><h3>VERSES</h3><div id="bible-verses" class="bible-grid numbers"></div><h3>SEARCH THIS BIBLE</h3><div class="bible-bar"><input id="bible-search" placeholder="Search a word or phrase" aria-label="Search Bible"><button id="bible-search-go">Search</button></div><div id="bible-results" class="verse-list"></div></section></div></section>
-<main><aside><small>ORDER OF SERVICE</small><div id="items"></div><p class="muted">Select an item to preview, then press Go live. Arrow keys move live slides. B toggles blackout.</p></aside><section class="workspace"><div class="monitor-grid"><section class="monitor"><h2>PREVIEW · NEXT SLIDE</h2><p class="muted">Only you see this preview.</p><div class="screen" id="preview"></div><div id="slides" class="slide-grid controls"></div><button class="primary" id="go">Go live →</button></section><section class="monitor"><h2>CONGREGATION · LIVE OUTPUT</h2><p class="muted">This mirrors the projector window.</p><div class="screen" id="live"></div><p class="status" id="status" aria-live="polite"></p><div class="controls"><button id="open-live" class="primary">Open projector ↗</button><button id="stageopen">Open stage ↗</button></div></section></div><div class="controls"><button id="prev">← Previous</button><button id="next">Next →</button><button id="blank">Blackout · B</button><button id="play">Play / Pause video</button><button id="restart">Restart video</button></div><p class="muted">Move the projector window to your extended second screen and use its Full screen button. Allow pop-ups when prompted. For video with sound, click Enable sound in that window once.</p></section></main>
+<main><aside><small>ORDER OF SERVICE</small><div id="items"></div><p class="muted">Select an item to preview, then press Go live. Arrow keys move live slides. B toggles blackout.</p></aside><section class="workspace"><div class="monitor-grid"><section class="monitor"><h2>PREVIEW · NEXT SLIDE</h2><p class="muted">Only you see this preview.</p><div class="screen" id="preview"></div><div id="slides" class="slide-grid controls"></div><button class="primary" id="go">Go live →</button></section><section class="monitor"><h2>CONGREGATION · LIVE OUTPUT</h2><p class="muted">This mirrors the projector window.</p><div class="screen" id="live"></div><p class="status" id="status" aria-live="polite"></p><p class="muted" id="projector-status" aria-live="polite">Projector disconnected — click Open projector once.</p><div class="controls"><button id="open-live" class="primary">Open projector ↗</button><button id="stageopen">Open stage ↗</button></div></section></div><div class="controls"><button id="prev">← Previous</button><button id="next">Next →</button><button id="blank">Blackout · B</button><button id="play">Play / Pause video</button><button id="restart">Restart video</button></div><p class="muted">Move the projector window to your extended second screen and use its Full screen button. Allow pop-ups when prompted. For video with sound, click Enable sound in that window once.</p></section></main>
 <div id="external" class="screen"></div><div id="stage" class="stage"></div>
 <script>
 'use strict';
+/*__TCC_OUTPUT_BRIDGE__*/
 const DATA=/*__TCC_DATA__*/;
 const BIBLES=/*__TCC_BIBLES__*/;
 const $=id=>document.getElementById(id), service=DATA.service;
-let previewIndex=0,previewSlide=0,state={item:0,slide:0,blank:true},projector=null,stageWindow=null;
+let previewIndex=0,previewSlide=0,state={item:0,slide:0,blank:true};
 $('title').textContent=DATA.service_title;document.documentElement.style.setProperty('--gold',DATA.theme.accent);
 function count(i){return Math.max(1,service[i]?.slides.length||0)}
 function content(target,itemIndex,slideIndex,blank,preview=false){
@@ -35,38 +36,40 @@ function content(target,itemIndex,slideIndex,blank,preview=false){
  else{const t=document.createElement('div');t.className='words';t.textContent=slide.text||'';t.style.fontSize=`clamp(18px, ${DATA.theme.font_size/14}vw, ${DATA.theme.font_size}px)`;target.append(t);const c=document.createElement('div');c.className='credit';c.textContent=item.credit||'';target.append(c);requestAnimationFrame(()=>fitText(t))}
 }
 function fitText(el){if(!el.isConnected||!el.parentElement)return;let size=Math.min(DATA.theme.font_size,el.parentElement.clientWidth/15);el.style.fontSize=size+'px';while(size>14&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)){el.style.fontSize=(--size)+'px'}}
-function stageRender(doc){
- const root=doc.getElementById('stage');root.replaceChildren();
- const current=service[state.item],s=current?.slides[state.slide];
- const title=doc.createElement('small');title.textContent=`${DATA.service_title} • ${new Date().toLocaleTimeString()}${state.blank?' • BLACKOUT':''}`;root.append(title);
- const body=doc.createElement('div');body.textContent=s?.text||current?.title||'Ready';root.append(body);
- const next=doc.createElement('small');next.textContent='NEXT: '+(current?.slides[state.slide+1]?.text||service[state.item+1]?.title||'End of service');root.append(next);
+function outputPacket(){
+ const obj=service[state.item];
+ return {item:obj,slide:obj?.slides[state.slide]||{},slideIndex:state.slide,blank:state.blank,theme:DATA.theme,title:DATA.service_title,next:obj?.slides[state.slide+1]?.text||service[state.item+1]?.title||'End of service'};
 }
-function send(){
+function send(publish=true){
  content($('live'),state.item,state.slide,state.blank,true);
- if(projector&&!projector.closed){content(projector.document.getElementById('external'),state.item,state.slide,state.blank,false)}
- if(stageWindow&&!stageWindow.closed)stageRender(stageWindow.document);
+ if(publish)outputBridge.publish(outputPacket());
  $('bible-status').textContent=state.blank?'OUTPUT BLACKED OUT':`LIVE: ${service[state.item]?.title||'Ready'} • Slide ${state.slide+1}`;
  $('status').textContent=state.blank?'OUTPUT BLACKED OUT':`LIVE: ${service[state.item]?.title||'Empty service'} • ${state.slide+1}/${count(state.item)}`;
 }
 function preview(){content($('preview'),previewIndex,previewSlide,false,true);$('slides').replaceChildren();const obj=service[previewIndex];for(let s=0;s<count(previewIndex)&&obj;s++){const b=document.createElement('button');b.textContent=obj.slides[s]?.label||`Slide ${s+1}`;b.className=s===previewSlide?'active':'';b.onclick=()=>{previewSlide=s;preview()};$('slides').append(b)}}
 function move(delta){if(!service.length)return;let i=state.item,s=state.slide+delta;if(s>=count(i)){if(i>=service.length-1)return;i++;s=0}if(s<0){if(i<=0)return;i--;s=count(i)-1}state={item:i,slide:s,blank:false};previewIndex=i;previewSlide=s;preview();send()}
-function openWindow(stage){
- const w=window.open('','_blank','popup,width=1280,height=720');if(!w){alert('Allow pop-ups to open the projector or stage window.');return null}
- // A direct window reference keeps file:// exports functional without cross-tab storage.
- w.document.write('<!doctype html><html><head><title>TCC Worship</title><style>'+document.querySelector('style').textContent+'</style></head><body class="'+(stage?'stage-mode':'output-mode')+'"><div id="external" class="screen"></div><div id="stage" class="stage"></div><div id="output-tools"><button id="full">Full screen</button><button id="sound">Enable sound / Play</button></div></body></html>');w.document.close();
- w.document.getElementById('full').onclick=()=>w.document.documentElement.requestFullscreen().catch(()=>{});
- w.document.getElementById('sound').onclick=()=>{const v=w.document.querySelector('video');if(v){v.muted=false;v.play().catch(()=>{})}};
- w.addEventListener('keydown',keys);w.addEventListener('resize',()=>w.document.querySelectorAll('.words').forEach(fitText));return w;
-}
 function keys(e){if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();move(1)}if(e.key==='ArrowLeft'){e.preventDefault();move(-1)}if(e.key.toLowerCase()==='b'){state.blank=!state.blank;send()}}
-$('open').onclick=$('open-live').onclick=()=>{projector=openWindow(false);send()};$('stageopen').onclick=()=>{stageWindow=openWindow(true);send()};
+const outputBridge=createTccOutputBridge({
+ session:DATA.presenter_session||'offline',
+ css:document.querySelector('style').textContent,
+ getPacket:outputPacket,
+ onError:message=>{ $('projector-status').textContent=message; },
+ onStatus:connected=>{ $('projector-status').textContent=connected?'Projector connected — Go live updates the same window.':'Projector disconnected — click Open projector once.'; },
+ onNavigate:action=>{if(action==='next')move(1);if(action==='previous')move(-1);if(action==='blackout'){state.blank=!state.blank;send();}},
+ onRestore:packet=>{
+   if(packet.item){let i=service.findIndex(x=>x.id===packet.item.id);if(i<0){service.push(packet.item);i=service.length-1;refreshItems();}
+     state={item:i,slide:Math.min(packet.slideIndex||0,count(i)-1),blank:packet.blank};
+     previewIndex=i;previewSlide=state.slide;preview();send(false);}
+ }
+});
+$('open').onclick=$('open-live').onclick=()=>outputBridge.open(false);
+$('stageopen').onclick=()=>outputBridge.open(true);
 $('go').onclick=()=>{state={item:previewIndex,slide:previewSlide,blank:false};send()};$('next').onclick=()=>move(1);$('prev').onclick=()=>move(-1);$('blank').onclick=()=>{state.blank=!state.blank;send()};
-$('play').onclick=()=>{const v=projector&&!projector.closed?projector.document.querySelector('video'):null;if(v){if(v.paused)v.play().catch(()=>alert('Click Enable sound / Play in the projector window.'));else v.pause()}else alert('Open the projector and send a video live first.')};
-$('restart').onclick=()=>{const v=projector&&!projector.closed?projector.document.querySelector('video'):null;if(v)v.currentTime=0};
+$('play').onclick=()=>outputBridge.media('toggle');
+$('restart').onclick=()=>outputBridge.media('restart');
 function refreshItems(){$('items').replaceChildren();service.forEach((obj,i)=>{const b=document.createElement('button');b.textContent=`${i+1}. ${obj.title}`;b.onclick=()=>{previewIndex=i;previewSlide=0;preview()};$('items').append(b)});}
 refreshItems();
-window.addEventListener('resize',()=>document.querySelectorAll('.words').forEach(fitText));window.addEventListener('keydown',keys);setInterval(()=>{if(stageWindow&&!stageWindow.closed)stageRender(stageWindow.document)},1000);preview();send();
+window.addEventListener('resize',()=>document.querySelectorAll('.words').forEach(fitText));window.addEventListener('keydown',keys);preview();send(false);
 
 let bibleIndex=0,bibleBook=Object.keys(BIBLES[0].books)[0],bibleChapter='1',bibleSelected=[1];
 function bible(){return BIBLES[bibleIndex]}
