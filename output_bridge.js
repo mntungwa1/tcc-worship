@@ -1,8 +1,32 @@
+/* Shared background layer; retain a looping video while text slides change. */
+function tccBackground(root, theme) {
+  const doc=root.ownerDocument||document;
+  const background=theme.background_media;
+  if(!background?.src){root.replaceChildren();return;}
+  for(const child of Array.from(root.children)){
+    if(child.className!=='background-media'&&child.className!=='background-shade')child.remove();
+  }
+  let media=root.querySelector('.background-media');
+  if(media&&(media.getAttribute('src')!==background.src||media.tagName!==(background.kind==='video'?'VIDEO':'IMG'))){media.remove();media=null;}
+  if(!media){
+    media=doc.createElement(background.kind==='video'?'video':'img');
+    media.className='background-media';media.src=background.src;
+    Object.assign(media.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'cover',zIndex:'0',pointerEvents:'none'});
+    if(background.kind==='video'){media.muted=true;media.autoplay=true;media.loop=true;media.playsInline=true;}
+    else media.alt='';
+    root.append(media);
+    if(background.kind==='video')media.play().catch(()=>{});
+  }
+  let shade=root.querySelector('.background-shade');
+  if(!shade){shade=doc.createElement('div');shade.className='background-shade';root.append(shade);}
+  Object.assign(shade.style,{position:'absolute',inset:'0',background:'#000',opacity:String(theme.background_overlay??0.45),zIndex:'1',pointerEvents:'none'});
+}
+
 /* Keep projector windows connected when Streamlit recreates the controller iframe. */
 function createTccOutputBridge(options, host = window) {
   const session = options.session;
   const token = Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const channelName = 'tcc-worship-output-' + session;
+  const channelName = 'tcc-worship-output-' + session + '-v2';
   let channel = null, published = false, sequence = 0;
   const handles = {projector:null, stage:null};
   const seen = {projector:0, stage:0};
@@ -44,12 +68,13 @@ function createTccOutputBridge(options, host = window) {
     catch (_) { w = null; }
     if (!w) { options.onError('Allow pop-ups to open the projector window.'); return; }
     try {
-      if (!w.tccOutput || w.tccOutput.session !== session) {
+      if (!w.tccOutput || w.tccOutput.session !== session || w.tccOutput.version!==2) {
+        if(w.tccOutput?.dispose)w.tccOutput.dispose();
         w.document.open();
         w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>TCC Worship</title><style>'+options.css+'</style></head><body class="'+(stage?'stage-mode':'output-mode')+'"><div id="external" class="screen"></div><div id="stage" class="stage"></div><div id="output-tools"><button id="full">Full screen</button><button id="sound">Enable sound / Play</button></div></body></html>');
         w.document.close();
         const script = w.document.createElement('script');
-        script.textContent = '('+tccProjectorRuntime.toString()+')('+JSON.stringify({session,mode,channelName})+');';
+        script.textContent = tccBackground.toString()+'\n('+tccProjectorRuntime.toString()+')('+JSON.stringify({session,mode,channelName})+');';
         w.document.body.append(script);
       }
       handles[mode] = w;
@@ -90,21 +115,22 @@ function tccProjectorRuntime(config) {
     if(packet?.tag===next.tag)return;
     packet=next;
     if(config.mode==='stage'){stageText();return;}
-    root.replaceChildren();root.style.background=packet.theme.background;
-    if(packet.blank||!packet.item)return;
+    root.style.background=packet.theme.background;
+    if(packet.blank||!packet.item){root.replaceChildren();return;}
     if(packet.item.kind==='video'){
-      const v=doc.createElement('video');v.src=packet.item.src;v.controls=true;v.loop=false;root.append(v);
+      root.replaceChildren();const v=doc.createElement('video');v.className='foreground-video';v.src=packet.item.src;v.controls=true;v.loop=false;root.append(v);
     }else if(packet.item.kind==='image'||packet.slide?.src){
-      const im=doc.createElement('img');im.src=packet.slide?.src||packet.item.src;im.alt=packet.item.title;root.append(im);
+      root.replaceChildren();const im=doc.createElement('img');im.src=packet.slide?.src||packet.item.src;im.alt=packet.item.title;root.append(im);
     }else{
-      const words=doc.createElement('div');words.className='words';words.dir='auto';words.textContent=packet.slide?.text||'';root.append(words);
-      const credit=doc.createElement('div');credit.className='credit';credit.textContent=packet.item.credit||'';root.append(credit);
+      tccBackground(root,packet.theme);
+      const words=doc.createElement('div');words.className='words';words.style.position='relative';words.style.zIndex='2';words.dir='auto';words.textContent=packet.slide?.text||'';root.append(words);
+      const credit=doc.createElement('div');credit.className='credit';credit.style.zIndex='3';credit.textContent=packet.item.credit||'';root.append(credit);
       host.requestAnimationFrame(()=>fit(words,packet.theme.font_size));
     }
   }
   function media(command) {
     if(config.mode!=='projector'||command.tag===mediaTag)return;mediaTag=command.tag;
-    const v=root.querySelector('video');if(!v)return;
+    const v=root.querySelector('.foreground-video');if(!v)return;
     if(command.action==='restart')v.currentTime=0;
     if(command.action==='toggle'){if(v.paused)v.play().catch(()=>{});else v.pause();}
   }
@@ -112,9 +138,9 @@ function tccProjectorRuntime(config) {
     if(channel)channel.postMessage({type:'navigate',session:config.session,action});
     else if(host.tccOutput.onNavigate)host.tccOutput.onNavigate(action);
   }
-  host.tccOutput={session:config.session,render,media,snapshot:()=>packet,onNavigate:null};
+  host.tccOutput={session:config.session,version:2,render,media,snapshot:()=>packet,onNavigate:null,dispose:()=>{host.clearInterval(timer);if(channel)channel.close();}};
   doc.getElementById('full').onclick=()=>doc.documentElement.requestFullscreen().catch(()=>{});
-  doc.getElementById('sound').onclick=()=>{const v=root.querySelector('video');if(v){v.muted=false;v.play().catch(()=>{});}};
+  doc.getElementById('sound').onclick=()=>{const v=root.querySelector('.foreground-video');if(v){v.muted=false;v.play().catch(()=>{});}};
   host.addEventListener('keydown',event=>{
     if(['INPUT','TEXTAREA'].includes(event.target.tagName))return;
     if(event.key==='ArrowRight'||event.key===' '){event.preventDefault();navigate('next');}
@@ -135,4 +161,4 @@ function tccProjectorRuntime(config) {
   host.addEventListener('pagehide',()=>{host.clearInterval(timer);if(channel)channel.close();},{once:true});
 }
 
-if(typeof module!=='undefined'&&module.exports)module.exports={createTccOutputBridge};
+if(typeof module!=='undefined'&&module.exports)module.exports={createTccOutputBridge,tccBackground};
