@@ -86,7 +86,7 @@ def queue(obj):
     w['service'].append(duplicate(obj))
     notify('Added to the service.')
 
-def preview(obj, slide=0, height=260):
+def preview(obj, slide=0, height=260, show_background=False):
     if obj['kind']=='song':
         obj=presentation_item(obj)
         slide=min(slide,len(obj['slides'])-1)
@@ -97,7 +97,88 @@ def preview(obj, slide=0, height=260):
     if s.get('src'):st.image(s['src']);return
     text=html.escape(s.get('text','')).replace('\n','<br>')
     credit=html.escape(obj.get('credit',''))
-    components.html(f'''<div style="box-sizing:border-box;height:{height-10}px;background:{w['theme']['background']};color:white;font:clamp(18px,2.2vw,30px)/1.35 Arial;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border:1px solid #34435c;border-radius:10px;padding:20px;overflow:auto"><div>{text}</div><div style="font-size:11px;color:#acb8cd;margin-top:16px">{credit}</div></div>''',height=height)
+    backdrop=w['theme'].get('background_media') if show_background else None
+    layer=''
+    if backdrop:
+        source=html.escape(backdrop['src'],quote=True)
+        style='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none'
+        layer=(f'<video src="{source}" style="{style}" muted autoplay loop playsinline></video>' if backdrop['kind']=='video' else f'<img src="{source}" alt="" style="{style}">')
+        layer+=f'<div style="position:absolute;inset:0;background:black;opacity:{w["theme"].get("background_overlay",0.45)}"></div>'
+    components.html(f'''<div style="position:relative;box-sizing:border-box;height:{height-10}px;background:{w['theme']['background']};color:white;font:clamp(18px,2.2vw,30px)/1.35 Arial;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border:1px solid #34435c;border-radius:10px;padding:20px;overflow:hidden">{layer}<div dir="auto" style="position:relative;z-index:2;overflow-wrap:anywhere">{text}</div><div style="position:relative;z-index:2;font-size:11px;color:#d4d9e2;margin-top:16px">{credit}</div></div>''',height=height)
+
+
+def set_background(asset,overlay=None):
+    candidate=copy.deepcopy(w)
+    if asset is None:
+        candidate['theme'].pop('background_media',None)
+    else:
+        candidate['theme']['background_media']={'kind':asset['kind'],'src':asset['src'],'name':asset['title'],'library_id':asset['id']}
+    if overlay is not None:candidate['theme']['background_overlay']=overlay
+    if len(backup_bytes(candidate))>MAX_BACKUP:
+        raise ValueError('The workspace would exceed 45 MB. Use smaller media or remove unused items.')
+    w['theme']=candidate['theme']
+
+
+def background_controls(prefix):
+    with st.expander('Image or video background'):
+        current=w['theme'].get('background_media')
+        options=['Solid colour','Image','Video']
+        default=options.index(current['kind'].title()) if current else 0
+        mode=st.radio('Background type',options,index=default,horizontal=True,key=prefix+'_bg_type')
+        chosen=None
+        if mode!='Solid colour':
+            assets=[x for x in w['library'] if x['kind']==mode.lower()]
+            if assets:
+                ids=[x['id'] for x in assets]
+                default_id=current.get('library_id') if current and current['kind']==mode.lower() else None
+                selected=st.selectbox('Choose from your '+mode.lower()+' library',ids,index=ids.index(default_id) if default_id in ids else 0,format_func=lambda value:next(x['title'] for x in assets if x['id']==value),key=prefix+'_bg_'+mode)
+                chosen=next(x for x in assets if x['id']==selected)
+            else:st.info('Add files in Media & presentations → '+mode+' library first.')
+        darkening=st.slider('Darken background for readable lyrics (%)',0,90,int(w['theme'].get('background_overlay',0.45)*100),key=prefix+'_bg_dark')
+        if st.button('Apply background',disabled=mode!='Solid colour' and chosen is None,key=prefix+'_bg_apply',type='primary'):
+            try:
+                set_background(chosen,darkening/100)
+                notify('Background updated. In Presentation desk, click Load / refresh live desk when ready.')
+            except ValueError as exc:st.error(str(exc))
+        if current:st.caption('Current background: '+current['name'])
+        st.caption('Applies behind lyrics, scripture and text slides. Video backgrounds loop silently. Image and video service items use their own content.')
+        if prefix=='settings':preview(item('Background preview','announcement','Background preview\nLet us worship together.'),height=220,show_background=True)
+
+
+def media_library(kind):
+    extensions=['png','jpg','jpeg','webp','gif'] if kind=='image' else ['mp4','webm']
+    uploads=st.file_uploader('Add '+kind+' files',type=extensions,accept_multiple_files=True,key=kind+'_library_uploads')
+    st.caption('Upload several files at once. Each file can be up to 20 MB; short videos work best for looping backgrounds.')
+    if st.button('Add files to '+kind+' library',disabled=not uploads,type='primary',key=kind+'_library_add'):
+        try:
+            candidate=copy.deepcopy(w);added=0
+            known={x.get('src') for x in candidate['library'] if x['kind']==kind}
+            mime={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.mp4':'video/mp4','.webm':'video/webm'}
+            for upload in uploads:
+                if upload.size>20*1024*1024:raise ValueError(upload.name+' exceeds 20 MB.')
+                src=media_data(upload.getvalue(),mime[Path(upload.name).suffix.lower()])
+                if src in known:continue
+                candidate['library'].append(item(Path(upload.name).stem,kind,src=src))
+                known.add(src);added+=1
+            if len(backup_bytes(candidate))>MAX_BACKUP:raise ValueError('The workspace would exceed 45 MB. Use smaller files or split the collection between backups.')
+            w['library']=candidate['library'];notify(f'Added {added} new {kind} files. Download a workspace backup to keep your library.')
+        except (ValueError,KeyError) as exc:st.error(str(exc))
+    assets=[x for x in w['library'] if x['kind']==kind]
+    st.caption(f'{len(assets)} items in your {kind} library')
+    query=st.text_input('Search '+kind+' library',key=kind+'_library_search')
+    assets=[x for x in assets if query.casefold() in x['title'].casefold()]
+    if not assets:st.info('No matching media yet. Upload files above.')
+    for obj in assets:
+        with st.expander(obj['title']):
+            if kind=='image':st.image(obj['src'],width=420)
+            else:st.video(obj['src'])
+            a,b=st.columns(2)
+            if a.button('Add to service',key='media_queue_'+obj['id']):queue(obj)
+            if b.button('Use as background',key='media_background_'+obj['id']):
+                try:
+                    set_background(obj)
+                    notify(obj['title']+' selected as background. Load / refresh the live desk when ready.')
+                except ValueError as exc:st.error(str(exc))
 
 
 @st.cache_data(ttl=86400, max_entries=12, show_spinner=False)
@@ -346,46 +427,52 @@ elif page=='Service planner':
                 if st.button('Duplicate item',key='dupe'+obj['id']):w['service'].insert(n+1,duplicate(obj));st.rerun()
 
 elif page=='Media & presentations':
-    st.write('Import images, MP4/WebM videos, PDF slides, or the text from a PowerPoint presentation.')
-    st.caption('For faithful PowerPoint layout, export to PDF first. PPTX import here reads text only; it does not reproduce graphics, animations or slide design.')
-    upload=st.file_uploader('Choose media or presentation',type=['png','jpg','jpeg','webp','mp4','webm','pdf','pptx'])
-    if upload:
-        st.caption(f'{upload.name} · {upload.size/1024/1024:.1f} MB')
-        title=st.text_input('Media title',value=Path(upload.name).stem)
-        if st.button('Import into library',type='primary'):
-            try:
-                if upload.size>20*1024*1024:raise ValueError('Each upload is limited to 20 MB in this release.')
-                suffix=Path(upload.name).suffix.lower();raw=upload.getvalue()
-                if suffix=='.pdf':
-                    import fitz
-                    with fitz.open(stream=raw,filetype='pdf') as pdf:
-                        if len(pdf)>80:raise ValueError('Limit each PDF to 80 pages.')
-                        obj=item(title,'presentation','temporary')
-                        obj['slides']=[{'label':f'Slide {i+1}','text':'','src':media_data(p.get_pixmap(matrix=fitz.Matrix(1.25,1.25)).tobytes('png'),'image/png')} for i,p in enumerate(pdf)]
-                elif suffix=='.pptx':
-                    from pptx import Presentation
-                    prs=Presentation(io.BytesIO(raw));obj=item(title,'presentation','temporary')
-                    obj['slides']=[{'label':f'Slide {i+1}','text':'\n'.join(shape.text for shape in slide.shapes if shape.has_text_frame)} for i,slide in enumerate(prs.slides)]
-                    obj['slides']=[s for s in obj['slides'] if s['text'].strip()]
-                    if not obj['slides']:raise ValueError('No text found. Export the slides to PDF and import that instead.')
-                else:
-                    mime={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.mp4':'video/mp4','.webm':'video/webm'}[suffix]
-                    obj=item(title,'video' if suffix in ('.mp4','.webm') else 'image',src=media_data(raw,mime))
-                candidate=copy.deepcopy(w);candidate['library'].append(obj)
-                if len(backup_bytes(candidate))>MAX_BACKUP:raise ValueError('Workspace would exceed 45 MB. Use smaller media or split services.')
-                w['library'].append(obj);notify('Imported. Find the item in Songs & library and add it to the service.')
-            except Exception as exc:st.error(f'Could not import: {exc}')
+    st.write('Build your image and video libraries. Use media as service items or as backgrounds behind lyrics.')
+    images_tab,videos_tab,presentations_tab=st.tabs(['Image library','Video library','Presentations'])
+    with images_tab:media_library('image')
+    with videos_tab:media_library('video')
+    with presentations_tab:
+        st.write('Import PDF slides or the editable text from a PowerPoint presentation.')
+        st.caption('For faithful PowerPoint layout, export to PDF first. PPTX import here reads text only; it does not reproduce graphics, animations or slide design.')
+        upload=st.file_uploader('Choose media or presentation',type=['pdf','pptx'])
+        if upload:
+            st.caption(f'{upload.name} · {upload.size/1024/1024:.1f} MB')
+            title=st.text_input('Media title',value=Path(upload.name).stem)
+            if st.button('Import into library',type='primary'):
+                try:
+                    if upload.size>20*1024*1024:raise ValueError('Each upload is limited to 20 MB in this release.')
+                    suffix=Path(upload.name).suffix.lower();raw=upload.getvalue()
+                    if suffix=='.pdf':
+                        import fitz
+                        with fitz.open(stream=raw,filetype='pdf') as pdf:
+                            if len(pdf)>80:raise ValueError('Limit each PDF to 80 pages.')
+                            obj=item(title,'presentation','temporary')
+                            obj['slides']=[{'label':f'Slide {i+1}','text':'','src':media_data(p.get_pixmap(matrix=fitz.Matrix(1.25,1.25)).tobytes('png'),'image/png')} for i,p in enumerate(pdf)]
+                    elif suffix=='.pptx':
+                        from pptx import Presentation
+                        prs=Presentation(io.BytesIO(raw));obj=item(title,'presentation','temporary')
+                        obj['slides']=[{'label':f'Slide {i+1}','text':'\n'.join(shape.text for shape in slide.shapes if shape.has_text_frame)} for i,slide in enumerate(prs.slides)]
+                        obj['slides']=[s for s in obj['slides'] if s['text'].strip()]
+                        if not obj['slides']:raise ValueError('No text found. Export the slides to PDF and import that instead.')
+                    else:
+                        mime={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.mp4':'video/mp4','.webm':'video/webm'}[suffix]
+                        obj=item(title,'video' if suffix in ('.mp4','.webm') else 'image',src=media_data(raw,mime))
+                    candidate=copy.deepcopy(w);candidate['library'].append(obj)
+                    if len(backup_bytes(candidate))>MAX_BACKUP:raise ValueError('Workspace would exceed 45 MB. Use smaller media or split services.')
+                    w['library'].append(obj);notify('Imported. Find the item in Songs & library and add it to the service.')
+                except Exception as exc:st.error(f'Could not import: {exc}')
 
 elif page=='Presentation desk':
     st.subheader('Live presentation desk')
+    background_controls('live')
     st.write('Select an item in the order of service below. The left screen is your preview; press **Go live** to send it to the congregation screen on the right.')
     st.caption('Click Open projector in the live desk to open a separate window. Move it to your extended second display, then click Full screen. Keep this desk open while presenting.')
     if w['service']:
         current_signature=json.dumps({'service':w['service'],'theme':w['theme'],'title':w['service_title'],'bibles':[b.get('id',b['name']) for b in st.session_state.bibles]},sort_keys=True)
-        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=3:
+        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=4:
             st.session_state.live_desk_html=export_html(w,st.session_state.bibles,output_session=st.session_state.presenter_session).decode('utf-8')
             st.session_state.live_desk_signature=current_signature
-            st.session_state.live_desk_version=3
+            st.session_state.live_desk_version=4
         if st.session_state.get('live_desk_signature')!=current_signature:
             st.info('Your service or Bible versions have changed. Click Load / refresh live desk when ready to use the updated service.')
         components.html(st.session_state.live_desk_html,height=1050,scrolling=True)
@@ -412,6 +499,7 @@ elif page=='Presentation desk':
 
 elif page=='Settings & backups':
     st.subheader('Presentation theme')
+    background_controls('settings')
     a,b,c=st.columns(3)
     w['theme']['background']=a.color_picker('Background',w['theme']['background'])
     w['theme']['accent']=b.color_picker('Accent',w['theme']['accent'])
