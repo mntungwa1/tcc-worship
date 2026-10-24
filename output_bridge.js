@@ -43,6 +43,9 @@ function createTccOutputBridge(options, host = window) {
       options.onRestore(data.packet);
     }
     if (data.type === 'navigate') options.onNavigate(data.action);
+    if(data.type==='capture-service'&&options.getWorkspace&&channel){
+      channel.postMessage({type:'service-snapshot',session,to:data.from,workspace:options.getWorkspace()});
+    }
   }
   if (channel) {
     channel.onmessage = event => message(event.data);
