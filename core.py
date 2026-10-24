@@ -107,6 +107,10 @@ def validate_workspace(data):
             for key in ('language', 'tags', 'credit'):
                 if not isinstance(obj.get(key, ''), str):
                     raise ValueError('Invalid item metadata.')
+            if obj['kind'] in ('image', 'video') and 'category' in obj:
+                from media_catalog import CATEGORIES
+                if obj['category'] not in CATEGORIES:
+                    raise ValueError('Media category must be one of the ten worship categories.')
             if not isinstance(obj.get('slides'), list) or len(obj['slides']) > 500:
                 raise ValueError('Invalid slide list.')
             for slide in obj['slides']:
@@ -123,6 +127,12 @@ def validate_workspace(data):
 def validate_media(src, kind):
     if not isinstance(src, str):
         raise ValueError('Invalid media.')
+    from media_catalog import is_cached_source
+    if is_cached_source(src):
+        suffix = Path(src).suffix
+        if (suffix in ('.mp4', '.webm')) != (kind == 'video'):
+            raise ValueError('Stored media type does not match this item.')
+        return
     prefix = r'data:image/(png|jpeg|webp|gif);base64,' if kind == 'image' else r'data:video/(mp4|webm);base64,'
     match = re.match(prefix, src)
     if not match:
@@ -153,6 +163,7 @@ def search_items(library, query='', language='All', favourites=False):
     return [x for x in library if (language == 'All' or x.get('language') == language)
             and (not favourites or x.get('favourite'))
             and all(w in ' '.join([x['title'], x.get('tags', ''),
+                      x.get('category', ''),
                       *[s.get('text', '') for s in x['slides']]]).casefold() for w in words)]
 
 def media_data(raw, mime):
@@ -160,6 +171,8 @@ def media_data(raw, mime):
 
 def export_html(data, bibles=None, output_session=None):
     validate_workspace(data)
+    from media_catalog import portable_workspace
+    data = portable_workspace(data)
     template = Path(__file__).with_name('presenter.html').read_text()
     export_data = {**data, 'presenter_session': output_session or uid(),
                    'service':[presentation_item(obj) for obj in data['service']]}

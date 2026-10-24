@@ -54,3 +54,29 @@ def test_live_desk_snapshot_changes_only_when_refreshed():
     assert not at.exception
     assert at.session_state.live_desk_html!=original
     assert 'Updated service title' in at.session_state.live_desk_html
+
+
+def test_media_categories_recategorisation_background_and_queue(tmp_path,monkeypatch):
+    import io
+    from PIL import Image
+    from media_catalog import import_uploads
+    monkeypatch.setenv('TCC_MEDIA_DIR',str(tmp_path/'media'))
+    at=AppTest.from_file(APP,default_timeout=30).run()
+    raw=io.BytesIO();Image.new('RGB',(32,20),'blue').save(raw,'PNG')
+    raw.seek(0);raw.name='Morning.png'
+    import_uploads(at.session_state.workspace,[raw],'image','Worship')
+    asset=at.session_state.workspace['library'][-1]
+    asset['credit']='Test creator · CC0'
+    next(x for x in at.radio if x.label=='Workspace').set_value('Media & presentations').run()
+    assert not at.exception
+    next(x for x in at.selectbox if x.key=='image_browse_category').set_value('Worship').run()
+    assert not at.exception
+    next(x for x in at.selectbox if x.key=='media_category_'+asset['id']).set_value('Prayer')
+    next(x for x in at.button if x.key=='media_category_save_'+asset['id']).click().run()
+    assert at.session_state.workspace['library'][-1]['category']=='Prayer'
+    next(x for x in at.selectbox if x.key=='image_browse_category').set_value('Prayer').run()
+    next(x for x in at.button if x.key=='media_background_'+asset['id']).click().run()
+    assert at.session_state.workspace['theme']['background_media']['src'].startswith('data:image/png;base64,')
+    next(x for x in at.button if x.key=='media_queue_'+asset['id']).click().run()
+    assert at.session_state.workspace['service'][-1]['src'].startswith('data:image/png;base64,')
+    assert not at.exception

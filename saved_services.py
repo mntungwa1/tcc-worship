@@ -9,6 +9,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from bible import validate_bible
 from core import validate_workspace, backup_bytes, MAX_BACKUP, duplicate
+from media_catalog import portable_workspace, is_cached_source
 
 MAX_PROJECT = 128 * 1024 * 1024
 _store = components.declare_component('tcc_saved_services',path=str(Path(__file__).with_name('saved_services_component')))
@@ -22,6 +23,8 @@ def make_project(workspace,bibles,kind='presentation'):
         if not songs:raise ValueError('Add songs to Service planner before saving a song list.')
         project['workspace']['service']=songs
         project['workspace']['library']=copy.deepcopy(songs)
+    else:
+        project['workspace']=portable_workspace(workspace)
     return validate_project(project)
 
 
@@ -49,7 +52,20 @@ def read_project(raw):
 
 def restore_project(current,project):
     project=validate_project(project)
-    if project['kind']=='presentation':return project['workspace'],project['bibles']
+    if project['kind']=='presentation':
+        result=project['workspace']
+        signatures={(x['kind'],x.get('media_hash') or x.get('src')) for x in result['library'] if x['kind'] in ('image','video')}
+        ids={x['id'] for x in result['library']}
+        for asset in current['library']:
+            signature=(asset['kind'],asset.get('media_hash') or asset.get('src'))
+            if asset['kind'] in ('image','video') and is_cached_source(asset.get('src')) and signature not in signatures:
+                entry=copy.deepcopy(asset)
+                if entry['id'] in ids:entry=duplicate(entry)
+                result['library'].append(entry);signatures.add(signature);ids.add(entry['id'])
+        if current.get('media_scope'):result['media_scope']=current['media_scope']
+        validate_workspace(result)
+        if len(backup_bytes(result))>MAX_BACKUP:raise ValueError('The saved preparation and library metadata exceed 45 MB.')
+        return result,project['bibles']
     result=copy.deepcopy(current)
     result['service']=copy.deepcopy(project['workspace']['service'])
     result['service_title']=project['workspace']['service_title']

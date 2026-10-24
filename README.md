@@ -58,13 +58,40 @@ If a browser restricts popup access when opening a local HTML file, place the fi
 - Library and service changes live in the Streamlit session. **Download a workspace backup before closing or restarting.** Cloud storage and team synchronisation are not implemented. A reconnect/restart can lose unsaved work.
 - The workspace backup contains the library, prepared service and theme. Imported Bible datasets, Bible favourites and passage history are session-only; retain Bible source files separately. Imported versions are embedded in the offline presentation export.
 - Extra Bible versions use the JSON structure below. They are not automatically downloaded from Holyrics. Only include texts you have permission to use.
-- 20 MB per media upload, 45 MB per workspace backup; maximum 80 PDF pages. Large video services need a later local media library rather than embedded files.
+- Images/videos accept individual files (20 MB each) and ZIP collections (512 MB per ZIP). The combined media collection supports 768 MB; the prepared service/metadata backup retains its 45 MB limit. Maximum 80 PDF pages.
 - PPTX import retains text only; PDF retains page appearance but no animation/video. MP4 playback depends on the browser and codec. Streaming services/YouTube playback are not implemented.
 - Offline HTML presentation is controlled from the exported controller on the same computer. The hosted Streamlit planner cannot control a presentation that has already been exported. In the offline presenter, the Holy Bible tab can look up and add new passages immediately; these live additions are not written back to the Streamlit workspace.
 - Imported comparison versions match identical references; versification mapping is not implemented.
 - Shared-password access is a basic gate, not individual user accounts or role-based administration.
 - FreeShow commands are experimental, restricted to localhost, and not hardware-tested. Enable FreeShow's REST API first. TCC does not automatically import services into FreeShow yet.
-- Automatic lyric following, microphone recognition, livestream/OBS output, countdowns, video backgrounds and mobile remote control are planned extensions, not implemented features.
+- Automatic lyric following, microphone recognition, livestream/OBS output, countdowns and mobile remote control are planned extensions. Image/video backgrounds are available from the media library.
+
+### Categorised image and video libraries
+
+Open **Media & presentations → Image library / Video library**. Upload `Images.zip`
+or `Videos.zip` into the matching library and click **Add files**. The importer
+recognises category folders even inside an outer `Images/` or `Videos/` directory:
+Praise, Worship, Offering, Communion, Sunday School, Prayer, Scripture, Welcome,
+Baptism, and Easter and Christmas. Loose files and unknown folder names use the
+selected upload category. Turn off folder recognition to put an entire batch into
+one selected category.
+
+Use **Browse category** to filter the collection, search within that category,
+and page through twelve previews at a time. **Move to category → Save category**
+changes an existing item's category. Background selection has the same category
+filter. Duplicate media is skipped; a `CREDITS.csv` supplied in the ZIP retains
+creator, licence and source information. Notes and preview HTML are not imported
+as media.
+
+Media bytes are streamed to a private disk cache rather than embedded in every
+library item. The collection's files are not committed to GitHub. Streamlit Cloud
+can clear this cache on restart/redeployment. Keep the original ZIPs or prepare a
+new collection ZIP from the library. Workspace JSON contains the collection's
+metadata/categories; restore the JSON, then upload the original ZIPs to reconnect
+missing cached files. Selected media in saved services and offline HTML exports
+is embedded so those preparations remain portable without the full collection.
+Other collection media stays in its separate ZIP. For a local installation,
+`TCC_MEDIA_DIR` can point to a durable private directory.
 
 ### Bible JSON format
 ```json

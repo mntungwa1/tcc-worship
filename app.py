@@ -13,6 +13,8 @@ from core import (new_workspace, item, duplicate, slides_from_text, search_items
 from bible import BOOKS, load_bible, validate_bible, parse_reference, passage_item
 from song_import import load_bundled_songs, fingerprint
 from saved_services import controls as saved_service_controls, restore_project
+from media_catalog import (CATEGORIES, asset_category, import_uploads, preview_source,
+                           embed_source, portable_item, archive_library)
 
 st.set_page_config(page_title='TCC Worship | Tabernacle Christian Centre', page_icon='✝', layout='wide')
 st.markdown('''<style>
@@ -105,16 +107,27 @@ def notify(message):
     st.rerun()
 
 def queue(obj):
-    w['service'].append(duplicate(obj))
-    notify('Added to the service.')
+    try:
+        candidate=copy.deepcopy(w)
+        candidate['service'].append(duplicate(portable_item(obj)))
+        if len(backup_bytes(candidate))>MAX_BACKUP:
+            raise ValueError('This prepared service would exceed 45 MB. Choose smaller media or split the service.')
+        w['service']=candidate['service']
+        notify('Added to the service.')
+    except ValueError as exc:st.error(str(exc))
 
 def preview(obj, slide=0, height=260, show_background=False):
     if obj['kind']=='song':
         obj=presentation_item(obj)
         slide=min(slide,len(obj['slides'])-1)
         st.caption(f"{obj['slides'][slide]['label']} · Slide {slide+1} of {len(obj['slides'])}")
-    if obj['kind']=='video':st.video(obj['src']);return
-    if obj['kind']=='image':st.image(obj['src']);return
+    if obj['kind'] in ('image','video'):
+        try:
+            src=preview_source(obj['src'])
+            if obj['kind']=='video':st.video(src)
+            else:st.image(src)
+        except ValueError as exc:st.info(str(exc))
+        return
     s=obj['slides'][slide]
     if s.get('src'):st.image(s['src']);return
     text=html.escape(s.get('text','')).replace('\n','<br>')
@@ -134,7 +147,7 @@ def set_background(asset,overlay=None):
     if asset is None:
         candidate['theme'].pop('background_media',None)
     else:
-        candidate['theme']['background_media']={'kind':asset['kind'],'src':asset['src'],'name':asset['title'],'library_id':asset['id']}
+        candidate['theme']['background_media']={'kind':asset['kind'],'src':embed_source(asset['src']),'name':asset['title'],'library_id':asset['id'],'category':asset_category(asset)}
     if overlay is not None:candidate['theme']['background_overlay']=overlay
     if len(backup_bytes(candidate))>MAX_BACKUP:
         raise ValueError('The workspace would exceed 45 MB. Use smaller media or remove unused items.')
@@ -150,6 +163,8 @@ def background_controls(prefix):
         chosen=None
         if mode!='Solid colour':
             assets=[x for x in w['library'] if x['kind']==mode.lower()]
+            category=st.selectbox('Background category',['All categories',*CATEGORIES],key=prefix+'_bg_category_'+mode)
+            if category!='All categories':assets=[x for x in assets if asset_category(x)==category]
             if assets:
                 ids=[x['id'] for x in assets]
                 default_id=current.get('library_id') if current and current['kind']==mode.lower() else None
@@ -169,31 +184,43 @@ def background_controls(prefix):
 
 def media_library(kind):
     extensions=['png','jpg','jpeg','webp','gif'] if kind=='image' else ['mp4','webm']
-    uploads=st.file_uploader('Add '+kind+' files',type=extensions,accept_multiple_files=True,key=kind+'_library_uploads')
-    st.caption('Upload several files at once. Each file can be up to 20 MB; short videos work best for looping backgrounds.')
+    default=st.selectbox('Category for loose files',CATEGORIES,index=CATEGORIES.index('Welcome'),key=kind+'_upload_category')
+    folders=st.checkbox('Use category folders in ZIP files',value=True,key=kind+'_use_folders')
+    st.caption('ZIP folders such as Praise, Communion or Sunday School assign categories automatically. Files without a matching folder use the category selected above.')
+    version=st.session_state.get(kind+'_upload_version',0)
+    uploads=st.file_uploader('Add '+kind+' files or ZIP collections',type=extensions+['zip'],accept_multiple_files=True,key=kind+'_library_uploads_'+str(version))
+    st.caption('ZIP upload: up to 512 MB. Each media file: up to 20 MB. Your full image/video collection can hold up to 768 MB.')
     if st.button('Add files to '+kind+' library',disabled=not uploads,type='primary',key=kind+'_library_add'):
         try:
-            candidate=copy.deepcopy(w);added=0
-            known={x.get('src') for x in candidate['library'] if x['kind']==kind}
-            mime={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.mp4':'video/mp4','.webm':'video/webm'}
-            for upload in uploads:
-                if upload.size>20*1024*1024:raise ValueError(upload.name+' exceeds 20 MB.')
-                src=media_data(upload.getvalue(),mime[Path(upload.name).suffix.lower()])
-                if src in known:continue
-                candidate['library'].append(item(Path(upload.name).stem,kind,src=src))
-                known.add(src);added+=1
-            if len(backup_bytes(candidate))>MAX_BACKUP:raise ValueError('The workspace would exceed 45 MB. Use smaller files or split the collection between backups.')
-            w['library']=candidate['library'];notify(f'Added {added} new {kind} files. Download a workspace backup to keep your library.')
-        except (ValueError,KeyError) as exc:st.error(str(exc))
-    assets=[x for x in w['library'] if x['kind']==kind]
-    st.caption(f'{len(assets)} items in your {kind} library')
+            with st.spinner('Importing files into their categories…'):
+                result=import_uploads(w,uploads,kind,default,folders)
+            st.session_state[kind+'_upload_version']=version+1
+            st.session_state.pop(kind+'_prepared_archive',None)
+            detail=', '.join(f'{name}: {count}' for name,count in result['categories'].items() if count)
+            message=f"Added {result['added']} files · restored {result['restored']} · duplicates skipped {result['duplicates']}."
+            if detail:message+=' '+detail+'.'
+            if result['ignored']:message+=f" Ignored {result['ignored']} supporting files or files for the other library."
+            notify(message)
+        except (ValueError,OSError) as exc:st.error(str(exc))
+    all_assets=[x for x in w['library'] if x['kind']==kind]
+    counts={name:sum(asset_category(x)==name for x in all_assets) for name in CATEGORIES}
+    st.caption(f'{len(all_assets)} items in your {kind} library · 10 categories')
+    category=st.selectbox('Browse category',['All categories',*CATEGORIES],format_func=lambda name:f"{name} ({len(all_assets) if name=='All categories' else counts[name]})",key=kind+'_browse_category')
     query=st.text_input('Search '+kind+' library',key=kind+'_library_search')
-    assets=[x for x in assets if query.casefold() in x['title'].casefold()]
-    if not assets:st.info('No matching media yet. Upload files above.')
-    for obj in assets:
-        with st.expander(obj['title']):
-            if kind=='image':st.image(obj['src'],width=420)
-            else:st.video(obj['src'])
+    assets=[x for x in all_assets if (category=='All categories' or asset_category(x)==category) and query.casefold() in (x['title']+' '+x.get('credit','')).casefold()]
+    if not assets:st.info('No matching media in this category yet. Upload files above or choose another category.')
+    pages=max(1,(len(assets)+11)//12)
+    page=st.selectbox('Page',range(1,pages+1),key=kind+'_media_page')
+    for obj in assets[(page-1)*12:page*12]:
+        with st.expander(obj['title']+' · '+asset_category(obj)):
+            preview(obj)
+            if obj.get('credit'):
+                with st.expander('Source and licence credits'):st.text(obj['credit'])
+            new_category=st.selectbox('Move to category',CATEGORIES,index=CATEGORIES.index(asset_category(obj)),key='media_category_'+obj['id'])
+            if st.button('Save category',key='media_category_save_'+obj['id']):
+                obj['category']=new_category
+                st.session_state.pop(kind+'_prepared_archive',None)
+                notify('Moved to '+new_category+'.')
             a,b=st.columns(2)
             if a.button('Add to service',key='media_queue_'+obj['id']):queue(obj)
             if b.button('Use as background',key='media_background_'+obj['id']):
@@ -201,6 +228,21 @@ def media_library(kind):
                     set_background(obj)
                     notify(obj['title']+' selected as background. Load / refresh the live desk when ready.')
                 except ValueError as exc:st.error(str(exc))
+    archive_signature=json.dumps([(x['id'],x['src'],asset_category(x)) for x in all_assets])
+    if st.session_state.get(kind+'_archive_signature')!=archive_signature:
+        st.session_state.pop(kind+'_prepared_archive',None)
+    if all_assets:
+        with st.expander('Keep a copy of this '+kind+' collection'):
+            st.caption('Keep the original ZIPs, or prepare a new category-organised ZIP here. Upload it again if a server restart clears the media files.')
+            if st.button('Prepare '+kind+' library ZIP',key=kind+'_prepare_archive'):
+                try:
+                    with st.spinner('Preparing your media ZIP…'):
+                        st.session_state[kind+'_prepared_archive']=archive_library(w,kind)
+                        st.session_state[kind+'_archive_signature']=archive_signature
+                except (ValueError,OSError) as exc:st.error(str(exc))
+            packed=st.session_state.get(kind+'_prepared_archive')
+            if packed:
+                st.download_button('Download '+kind+' library ZIP',packed,file_name='Images.zip' if kind=='image' else 'Videos.zip',mime='application/zip',key=kind+'_archive_download')
 
 
 @st.cache_data(ttl=86400, max_entries=12, show_spinner=False)
@@ -453,7 +495,7 @@ elif page=='Service planner':
 
 elif page=='Media & presentations':
     st.write('Build your image and video libraries. Use media as service items or as backgrounds behind lyrics.')
-    st.caption('Keep your media collection: Settings & backups → Download workspace backup.')
+    st.caption('Upload Images.zip or Videos.zip into the matching library below. Keep your ZIPs for a full media backup; saved services include the media selected for that service.')
     images_tab,videos_tab,presentations_tab=st.tabs(['Image library','Video library','Presentations'])
     with images_tab:media_library('image')
     with videos_tab:media_library('video')
@@ -538,7 +580,7 @@ elif page=='Settings & backups':
     w['theme']['accent']=b.color_picker('Accent',w['theme']['accent'])
     w['theme']['font_size']=c.slider('Presentation text size',24,90,w['theme']['font_size'])
     st.subheader('Save and restore')
-    st.write('The workspace is held in this browser session. Download backups regularly. This release does not automatically save to GitHub or provide team synchronisation.')
+    st.write('Download the workspace JSON and keep your media ZIP files with it. After a server restart, restore the JSON and re-upload the ZIPs to reconnect the full collection. Saved services and offline presentations embed their selected media.')
     st.download_button('Download workspace backup',backup_bytes(w),file_name='TCC_Worship_Backup.json',mime='application/json')
     restored=st.file_uploader('Restore TCC workspace JSON',type=['json'],key='restore')
     confirm=st.checkbox('Replace the current workspace with this backup')
