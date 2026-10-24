@@ -9,7 +9,7 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 from core import (new_workspace, item, duplicate, slides_from_text, search_items, presentation_item,
-                  backup_bytes, load_backup, media_data, export_html, MAX_BACKUP)
+                  backup_bytes, load_backup, media_data, export_html, MAX_BACKUP, FONT_FAMILIES)
 from bible import BOOKS, load_bible, validate_bible, parse_reference, passage_item
 from song_import import load_bundled_songs, fingerprint
 from saved_services import controls as saved_service_controls, restore_project
@@ -139,7 +139,9 @@ def preview(obj, slide=0, height=260, show_background=False):
         style='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none'
         layer=(f'<video src="{source}" style="{style}" muted autoplay loop playsinline></video>' if backdrop['kind']=='video' else f'<img src="{source}" alt="" style="{style}">')
         layer+=f'<div style="position:absolute;inset:0;background:black;opacity:{w["theme"].get("background_overlay",0.45)}"></div>'
-    components.html(f'''<div style="position:relative;box-sizing:border-box;height:{height-10}px;background:{w['theme']['background']};color:white;font:clamp(18px,2.2vw,30px)/1.35 Arial;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border:1px solid #34435c;border-radius:10px;padding:20px;overflow:hidden">{layer}<div dir="auto" style="position:relative;z-index:2;overflow-wrap:anywhere">{text}</div><div style="position:relative;z-index:2;font-size:11px;color:#d4d9e2;margin-top:16px">{credit}</div></div>''',height=height)
+    font=html.escape(w['theme'].get('font_family','Arial'),quote=True)
+    size=w['theme']['font_size']
+    components.html(f'''<div style="position:relative;box-sizing:border-box;height:{height-10}px;background:{w['theme']['background']};color:white;font-family:'{font}';font-size:clamp(14px,{size/12.8}vw,{size}px);line-height:1.35;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border:1px solid #34435c;border-radius:10px;padding:20px;overflow:hidden">{layer}<div dir="auto" style="position:relative;z-index:2;overflow-wrap:anywhere">{text}</div><div style="position:relative;z-index:2;font-size:11px;color:#d4d9e2;margin-top:16px">{credit}</div></div>''',height=height)
 
 
 def set_background(asset,overlay=None):
@@ -571,10 +573,10 @@ elif page=='Presentation desk':
     st.caption('Click Open projector in the live desk to open a separate window. Move it to your extended second display, then click Full screen. Keep this desk open while presenting.')
     if w['service']:
         current_signature=json.dumps({'service':w['service'],'theme':w['theme'],'title':w['service_title'],'bibles':[b.get('id',b['name']) for b in st.session_state.bibles]},sort_keys=True)
-        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=5:
+        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=6:
             st.session_state.live_desk_html=export_html(w,st.session_state.bibles,output_session=st.session_state.presenter_session).decode('utf-8')
             st.session_state.live_desk_signature=current_signature
-            st.session_state.live_desk_version=5
+            st.session_state.live_desk_version=6
         if st.session_state.get('live_desk_signature')!=current_signature:
             st.info('Your service or Bible versions have changed. Click Load / refresh live desk when ready to use the updated service.')
         components.html(st.session_state.live_desk_html,height=1050,scrolling=True)
@@ -609,10 +611,14 @@ elif page=='Saved services':
 elif page=='Settings & backups':
     st.subheader('Presentation theme')
     background_controls('settings')
+    fonts=list(FONT_FAMILIES)
+    w['theme']['font_family']=st.selectbox('Font type',fonts,index=fonts.index(w['theme'].get('font_family','Arial')))
     a,b,c=st.columns(3)
     w['theme']['background']=a.color_picker('Background',w['theme']['background'])
     w['theme']['accent']=b.color_picker('Accent',w['theme']['accent'])
-    w['theme']['font_size']=c.slider('Presentation text size',24,90,w['theme']['font_size'])
+    w['theme']['font_size']=c.slider('Font size',24,90,w['theme']['font_size'])
+    st.caption('Applies to lyrics, scripture and text slides. Long text shrinks to fit. In Presentation desk, use the font controls for immediate projector updates; save the prepared presentation there to keep live changes.')
+    preview(item('Font preview','announcement','Let us worship together.'),height=240,show_background=True)
     st.subheader('Save and restore')
     st.write('Download the workspace JSON and keep your media ZIP files with it. After a server restart, restore the JSON and re-upload the ZIPs to reconnect the full collection. Saved services and offline presentations embed their selected media.')
     st.download_button('Download workspace backup',backup_bytes(w),file_name='TCC_Worship_Backup.json',mime='application/json')

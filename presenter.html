@@ -11,9 +11,11 @@ nav{display:flex;gap:8px;padding:12px 28px;border-bottom:1px solid #283348}.bibl
 .monitor .status{min-height:24px}.controls button{white-space:normal;overflow-wrap:anywhere}
 @media(max-width:1000px){main{grid-template-columns:210px minmax(0,1fr)}.workspace{padding:16px}.monitor-grid{gap:12px}}
 @media(max-width:700px){main{grid-template-columns:1fr}.monitor-grid{grid-template-columns:1fr}}
+.font-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 28px;border-bottom:1px solid #283348}.font-controls label{display:flex;align-items:center;gap:8px}.font-controls select{font:inherit;background:#17253b;color:white;padding:8px;border:1px solid #42516d;border-radius:7px}.font-controls input{width:160px}.output-mode .font-controls,.stage-mode .font-controls{display:none}
 </style></head><body>
 <header><img src="__TCC_LOGO__" alt="Tabernacle Christian Centre" style="width:150px;height:85px;object-fit:contain;background:white;border-radius:8px;margin-right:18px"><div style="flex:1"><small>TCC WORSHIP / PRESENTATION DESK</small><h1 id="title"></h1></div><button class="primary" id="open">Open projector ↗</button></header>
 <nav><button id="service-tab" class="active">Service desk</button><button id="bible-tab">Holy Bible</button></nav>
+<div class="font-controls"><label>Font type <select id="font-family"></select></label><label>Font size <input id="font-size" type="range" min="24" max="90" step="1"><output id="font-size-value"></output></label><small>Updates live text immediately. Long text shrinks to fit. Save your prepared presentation to keep changes.</small></div>
 <section class="bible-panel"><div class="bible-bar"><select id="bible-version" aria-label="Bible version"></select><input id="bible-ref" placeholder="Quick reference: John 3:16-18" aria-label="Quick reference"><button id="bible-find" class="primary">Find passage</button></div><div class="bible-desk"><section><h2 id="bible-heading"></h2><label><input id="multi-verse" type="checkbox"> Select multiple verses</label><div id="verse-list" class="verse-list"></div><div class="screen bible-preview" id="bible-preview"></div><div class="controls"><button id="bible-live" class="primary">Go live with passage</button><button id="bible-add">Add to service</button><button id="bible-prev">← Live previous</button><button id="bible-next">Live next →</button><button id="bible-blank">Blackout</button></div><p class="status" id="bible-status" aria-live="polite"></p></section><section><h3>BOOKS · OLD TESTAMENT / NEW TESTAMENT</h3><div id="bible-books" class="bible-grid books"></div><h3>CHAPTERS</h3><div id="bible-chapters" class="bible-grid numbers"></div><h3>VERSES</h3><div id="bible-verses" class="bible-grid numbers"></div><h3>SEARCH THIS BIBLE</h3><div class="bible-bar"><input id="bible-search" placeholder="Search a word or phrase" aria-label="Search Bible"><button id="bible-search-go">Search</button></div><div id="bible-results" class="verse-list"></div></section></div></section>
 <main><aside><small>ORDER OF SERVICE</small><div id="items"></div><p class="muted">Select an item to preview, then press Go live. Arrow keys move live slides. B toggles blackout.</p></aside><section class="workspace"><div class="monitor-grid"><section class="monitor"><h2>PREVIEW · NEXT SLIDE</h2><p class="muted">Only you see this preview.</p><div class="screen" id="preview"></div><div id="slides" class="slide-grid controls"></div><button class="primary" id="go">Go live →</button></section><section class="monitor"><h2>CONGREGATION · LIVE OUTPUT</h2><p class="muted">This mirrors the projector window.</p><div class="screen" id="live"></div><p class="status" id="status" aria-live="polite"></p><p class="muted" id="projector-status" aria-live="polite">Projector disconnected — click Open projector once.</p><div class="controls"><button id="open-live" class="primary">Open projector ↗</button><button id="stageopen">Open stage ↗</button></div></section></div><div class="controls"><button id="prev">← Previous</button><button id="next">Next →</button><button id="blank">Blackout · B</button><button id="play">Play / Pause video</button><button id="restart">Restart video</button></div><p class="muted">Move the projector window to your extended second screen and use its Full screen button. Allow pop-ups when prompted. For video with sound, click Enable sound in that window once.</p></section></main>
 <div id="external" class="screen"></div><div id="stage" class="stage"></div>
@@ -35,7 +37,7 @@ function content(target,itemIndex,slideIndex,blank,preview=false){
  }else if(item.kind==='image'||slide.src){target.replaceChildren();const im=document.createElement('img');im.src=slide.src||item.src;im.alt=item.title;target.append(im)}
  else{tccBackground(target,DATA.theme);const t=document.createElement('div');t.className='words';t.style.position='relative';t.style.zIndex='2';t.textContent=slide.text||'';t.style.fontSize=`clamp(18px, ${DATA.theme.font_size/14}vw, ${DATA.theme.font_size}px)`;target.append(t);const c=document.createElement('div');c.className='credit';c.style.zIndex='3';c.textContent=item.credit||'';target.append(c);requestAnimationFrame(()=>fitText(t))}
 }
-function fitText(el){if(!el.isConnected||!el.parentElement)return;let size=Math.min(DATA.theme.font_size,el.parentElement.clientWidth/15);el.style.fontSize=size+'px';while(size>14&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)){el.style.fontSize=(--size)+'px'}}
+function fitText(el){if(!el.isConnected||!el.parentElement)return;el.style.fontFamily=DATA.theme.font_family||'Arial';let size=Math.max(14,DATA.theme.font_size*el.parentElement.clientWidth/1280);el.style.fontSize=size+'px';while(size>14&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)){el.style.fontSize=(--size)+'px'}}
 function outputPacket(){
  const obj=service[state.item];
  return {item:obj,slide:obj?.slides[state.slide]||{},slideIndex:state.slide,blank:state.blank,theme:DATA.theme,title:DATA.service_title,next:obj?.slides[state.slide+1]?.text||service[state.item+1]?.title||'End of service'};
@@ -48,7 +50,7 @@ function send(publish=true){
 }
 function preview(){content($('preview'),previewIndex,previewSlide,false,true);$('slides').replaceChildren();const obj=service[previewIndex];for(let s=0;s<count(previewIndex)&&obj;s++){const b=document.createElement('button');b.textContent=obj.slides[s]?.label||`Slide ${s+1}`;b.className=s===previewSlide?'active':'';b.onclick=()=>{previewSlide=s;preview()};$('slides').append(b)}}
 function move(delta){if(!service.length)return;let i=state.item,s=state.slide+delta;if(s>=count(i)){if(i>=service.length-1)return;i++;s=0}if(s<0){if(i<=0)return;i--;s=count(i)-1}state={item:i,slide:s,blank:false};previewIndex=i;previewSlide=s;preview();send()}
-function keys(e){if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();move(1)}if(e.key==='ArrowLeft'){e.preventDefault();move(-1)}if(e.key.toLowerCase()==='b'){state.blank=!state.blank;send()}}
+function keys(e){if(['INPUT','TEXTAREA','SELECT','BUTTON'].includes(e.target.tagName))return;if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();move(1)}if(e.key==='ArrowLeft'){e.preventDefault();move(-1)}if(e.key.toLowerCase()==='b'){state.blank=!state.blank;send()}}
 const outputBridge=createTccOutputBridge({
  session:DATA.presenter_session||'offline',
  css:document.querySelector('style').textContent,
@@ -102,4 +104,19 @@ $('bible-find').onclick=()=>{
 $('bible-ref').addEventListener('keydown',e=>{if(e.key==='Enter'){$('bible-find').click();e.stopPropagation()}});
 $('bible-search-go').onclick=()=>{const q=$('bible-search').value.trim().toLowerCase();$('bible-results').replaceChildren();if(!q)return;let count=0;for(const [book,chapters] of Object.entries(bible().books)){for(const [ch,verses] of Object.entries(chapters)){for(const [v,text] of Object.entries(verses)){if(text.toLowerCase().includes(q)&&count++<40){const el=document.createElement('button');el.textContent=`${book} ${ch}:${v} — ${text.slice(0,120)}`;el.onclick=()=>{bibleBook=book;bibleChapter=ch;bibleSelected=[+v];renderBible()};$('bible-results').append(el)}}}}const total=document.createElement('p');total.textContent=`${count} matches · up to 40 shown`;$('bible-results').prepend(total)};
 renderBible();
+const fonts=['Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Courier New','sans-serif','serif'];
+for(const name of fonts){const option=document.createElement('option');option.value=name;option.textContent=name;option.style.fontFamily=name;$('font-family').append(option);}
+$('font-family').value=DATA.theme.font_family||'Arial';
+$('font-size').value=DATA.theme.font_size;
+$('font-size-value').textContent=DATA.theme.font_size;
+function updateTypography(){
+ DATA.theme.font_family=$('font-family').value;
+ DATA.theme.font_size=Number($('font-size').value);
+ $('font-size-value').textContent=DATA.theme.font_size;
+ document.querySelectorAll('.words').forEach(fitText);
+ // Publish the new theme without recreating media elements or changing the live slide.
+ outputBridge.publish(outputPacket());
+}
+$('font-family').onchange=updateTypography;
+$('font-size').oninput=updateTypography;
 </script></body></html>

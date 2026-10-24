@@ -89,3 +89,20 @@ test('An image background uses cover sizing behind the overlay',()=>{
  assert.equal(root.children[0].style.zIndex,'0');
  assert.equal(root.children[1].style.zIndex,'1');
 });
+
+test('Font type and size update the same live text and projector window',()=>{
+ const env=environment(),desk=controller(env);desk.bridge.open(false);
+ const output=[...env.windows.values()][0];
+ const words=output.nodes.external.children.find(x=>x.className==='words');
+ desk.set({theme:{background:'#101d35',font_size:80,font_family:'Georgia'}});
+ desk.bridge.publish(desk.get());
+ assert.equal(output.nodes.external.children.find(x=>x.className==='words'),words);
+ assert.equal(words.style.fontFamily,'Georgia');
+ assert.equal(words.style.fontSize,'80px');
+ desk.set({theme:{background:'#101d35',font_size:24,font_family:'Verdana'}});
+ desk.bridge.publish(desk.get());
+ assert.equal(words.style.fontFamily,'Verdana');
+ assert.equal(words.style.fontSize,'24px');
+ assert.equal(env.created(),1);
+ assert.equal(output.tccOutput.snapshot().slide.text,'First lyric');
+});

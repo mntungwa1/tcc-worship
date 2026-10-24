@@ -71,7 +71,7 @@ function createTccOutputBridge(options, host = window) {
     catch (_) { w = null; }
     if (!w) { options.onError('Allow pop-ups to open the projector window.'); return; }
     try {
-      if (!w.tccOutput || w.tccOutput.session !== session || w.tccOutput.version!==2) {
+      if (!w.tccOutput || w.tccOutput.session !== session || w.tccOutput.version!==3) {
         if(w.tccOutput?.dispose)w.tccOutput.dispose();
         w.document.open();
         w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>TCC Worship</title><style>'+options.css+'</style></head><body class="'+(stage?'stage-mode':'output-mode')+'"><div id="external" class="screen"></div><div id="stage" class="stage"></div><div id="output-tools"><button id="full">Full screen</button><button id="sound">Enable sound / Play</button></div></body></html>');
@@ -105,18 +105,25 @@ function tccProjectorRuntime(config) {
   try { channel = new BroadcastChannel(config.channelName); } catch (_) {}
   const root = doc.getElementById(config.mode==='stage'?'stage':'external');
   function fit(el,maximum) {
-    let size=Math.min(maximum,root.clientWidth/15); el.style.fontSize=size+'px';
+    el.style.fontFamily=packet?.theme.font_family||'Arial';
+    let size=Math.max(14,maximum*root.clientWidth/1280); el.style.fontSize=size+'px';
     while(size>14&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)) el.style.fontSize=(--size)+'px';
   }
   function stageText() {
     root.replaceChildren(); if(!packet)return;
     const title=doc.createElement('small'); title.textContent=packet.title+' • '+new Date().toLocaleTimeString()+(packet.blank?' • BLACKOUT':'');root.append(title);
-    const body=doc.createElement('div');body.textContent=packet.slide?.text||packet.item?.title||'Ready';root.append(body);
+    const body=doc.createElement('div');body.style.fontFamily=packet.theme.font_family||'Arial';body.style.fontSize=packet.theme.font_size+'px';body.textContent=packet.slide?.text||packet.item?.title||'Ready';root.append(body);
     const next=doc.createElement('small');next.textContent='NEXT: '+packet.next;root.append(next);
   }
   function render(next) {
     if(packet?.tag===next.tag)return;
+    const previous=packet;
     packet=next;
+    const typographyOnly=previous&&previous.item?.id===next.item?.id&&previous.slideIndex===next.slideIndex&&previous.blank===next.blank&&JSON.stringify({...previous.theme,font_family:null,font_size:null})===JSON.stringify({...next.theme,font_family:null,font_size:null})&&JSON.stringify(previous.slide)===JSON.stringify(next.slide);
+    if(typographyOnly&&config.mode==='projector'){
+      root.querySelectorAll('.words').forEach(el=>fit(el,packet.theme.font_size));
+      return;
+    }
     if(config.mode==='stage'){stageText();return;}
     root.style.background=packet.theme.background;
     if(packet.blank||!packet.item){root.replaceChildren();return;}
@@ -141,7 +148,7 @@ function tccProjectorRuntime(config) {
     if(channel)channel.postMessage({type:'navigate',session:config.session,action});
     else if(host.tccOutput.onNavigate)host.tccOutput.onNavigate(action);
   }
-  host.tccOutput={session:config.session,version:2,render,media,snapshot:()=>packet,onNavigate:null,dispose:()=>{host.clearInterval(timer);if(channel)channel.close();}};
+  host.tccOutput={session:config.session,version:3,render,media,snapshot:()=>packet,onNavigate:null,dispose:()=>{host.clearInterval(timer);if(channel)channel.close();}};
   doc.getElementById('full').onclick=()=>doc.documentElement.requestFullscreen().catch(()=>{});
   doc.getElementById('sound').onclick=()=>{const v=root.querySelector('.foreground-video');if(v){v.muted=false;v.play().catch(()=>{});}};
   host.addEventListener('keydown',event=>{

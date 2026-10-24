@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 
 MAX_BACKUP = 45 * 1024 * 1024
+FONT_FAMILIES = ('Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'sans-serif', 'serif')
 KINDS = {'song', 'scripture', 'announcement', 'image', 'video', 'presentation'}
 
 def uid():
@@ -68,7 +69,7 @@ def new_workspace():
         '[Verse 1]\nTogether we gather in hope\nTogether we lift up our praise\n\n[Chorus]\nLet every heart sing with joy\nLet every voice give thanks',
         language='English', tags='Demo, Thanksgiving', credit='Original demonstration text for TCC Worship')
     return {'schema_version': 1, 'service_title': 'TCC Sunday Worship',
-            'theme': {'background': '#101d35', 'accent': '#e8bc73', 'font_size': 54},
+            'theme': {'background': '#101d35', 'accent': '#e8bc73', 'font_size': 54, 'font_family': 'Arial'},
             'library': [logo, welcome, demo], 'service': [copy.deepcopy(logo), copy.deepcopy(welcome)]}
 
 def validate_workspace(data):
@@ -82,6 +83,8 @@ def validate_workspace(data):
             raise ValueError('Theme colours must be six-digit hex colours.')
     if type(theme.get('font_size')) is not int or not 24 <= theme['font_size'] <= 90:
         raise ValueError('Font size must be between 24 and 90.')
+    if theme.get('font_family', 'Arial') not in FONT_FAMILIES:
+        raise ValueError('Choose a supported presentation font.')
     backdrop=theme.get('background_media')
     if backdrop is not None:
         if not isinstance(backdrop,dict) or backdrop.get('kind') not in ('image','video'):
