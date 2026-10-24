@@ -3,15 +3,25 @@ from streamlit.testing.v1 import AppTest
 
 APP=str(Path(__file__).resolve().parents[1]/'app.py')
 
+def authenticated_app():
+    at=AppTest.from_file(APP,default_timeout=30)
+    at.secrets['APP_PASSWORD']='test-church-password'
+    at.run()
+    next(x for x in at.text_input if x.label=='Church access password').set_value('test-church-password')
+    next(x for x in at.button if x.label=='Open worship desk').click().run()
+    assert not at.exception
+    return at
+
+
 def test_all_workspaces_render():
-    at=AppTest.from_file(APP,default_timeout=30).run()
+    at=authenticated_app()
     assert not at.exception
     for page in ['Songs & library','Bible desk','Service planner','Media & presentations','Presentation desk','Saved services','Settings & backups','Overview']:
         next(x for x in at.radio if x.label=='Workspace').set_value(page).run()
         assert not at.exception, (page,at.exception)
 
 def test_create_song_search_and_queue():
-    at=AppTest.from_file(APP,default_timeout=30).run()
+    at=authenticated_app()
     next(x for x in at.radio if x.label=='Workspace').set_value('Songs & library').run()
     next(x for x in at.text_input if x.label=='Title').set_value('Test hymn')
     next(x for x in at.text_area).set_value('[Verse 1]\nA line of praise\n\n[Chorus]\nTogether we sing')
@@ -24,7 +34,7 @@ def test_create_song_search_and_queue():
     assert len(at.session_state.workspace['service'][-1]['slides'])==2
 
 def test_bible_navigation_and_passage_queue():
-    at=AppTest.from_file(APP,default_timeout=30).run()
+    at=authenticated_app()
     next(x for x in at.radio if x.label=='Workspace').set_value('Bible desk').run()
     next(x for x in at.text_input if x.label=='Quick reference').set_value('John 3:16-18')
     next(b for b in at.button if b.label=='Find passage').click().run()
@@ -40,7 +50,7 @@ def test_bible_navigation_and_passage_queue():
 
 
 def test_live_desk_snapshot_changes_only_when_refreshed():
-    at=AppTest.from_file(APP,default_timeout=30).run()
+    at=authenticated_app()
     next(x for x in at.radio if x.label=='Workspace').set_value('Presentation desk').run()
     assert not at.exception
     original=at.session_state.live_desk_html
@@ -61,7 +71,7 @@ def test_media_categories_recategorisation_background_and_queue(tmp_path,monkeyp
     from PIL import Image
     from media_catalog import import_uploads
     monkeypatch.setenv('TCC_MEDIA_DIR',str(tmp_path/'media'))
-    at=AppTest.from_file(APP,default_timeout=30).run()
+    at=authenticated_app()
     raw=io.BytesIO();Image.new('RGB',(32,20),'blue').save(raw,'PNG')
     raw.seek(0);raw.name='Morning.png'
     import_uploads(at.session_state.workspace,[raw],'image','Worship')
@@ -84,7 +94,7 @@ def test_media_categories_recategorisation_background_and_queue(tmp_path,monkeyp
 
 
 def test_empty_background_category_keeps_file_picker_and_explorer_upload_visible():
-    at=AppTest.from_file(APP,default_timeout=30).run()
+    at=authenticated_app()
     next(x for x in at.radio if x.label=='Workspace').set_value('Presentation desk').run()
     next(x for x in at.radio if x.key=='live_bg_type').set_value('Video').run()
     next(x for x in at.selectbox if x.key=='live_bg_category_Video').set_value('Sunday School').run()
@@ -109,7 +119,7 @@ def test_background_computer_upload_selects_file_then_applies(tmp_path,monkeypat
             return [raw] if kwargs['key'].endswith('_0') else []
         return original(label,*args,**kwargs)
     monkeypatch.setattr(st,'file_uploader',picker)
-    at=AppTest.from_file(APP,default_timeout=30).run()
+    at=authenticated_app()
     next(x for x in at.radio if x.label=='Workspace').set_value('Presentation desk').run()
     next(x for x in at.radio if x.key=='live_bg_type').set_value('Image').run()
     next(x for x in at.selectbox if x.key=='live_bg_upload_category_Image').set_value('Sunday School').run()
@@ -125,3 +135,36 @@ def test_background_computer_upload_selects_file_then_applies(tmp_path,monkeypat
     assert not at.exception
     assert at.session_state.workspace['theme']['background_media']['name']=='Garden'
     assert at.session_state.workspace['theme']['background_media']['src'].startswith('data:image/png;base64,')
+
+
+def test_password_gate_rejects_wrong_password_and_locks_desk():
+    at=AppTest.from_file(APP,default_timeout=30)
+    at.secrets['APP_PASSWORD']='test-church-password'
+    at.run()
+    assert not at.radio
+    assert 'workspace' not in at.session_state
+    next(x for x in at.text_input if x.label=='Church access password').set_value('wrong')
+    next(x for x in at.button if x.label=='Open worship desk').click().run()
+    assert any('Incorrect password' in x.value for x in at.error)
+    assert not at.radio
+    next(x for x in at.text_input if x.label=='Church access password').set_value('test-church-password')
+    next(x for x in at.button if x.label=='Open worship desk').click().run()
+    assert at.session_state.authenticated
+    assert 'church_login_password' not in at.session_state
+    next(x for x in at.button if x.label=='Lock desk').click().run()
+    assert not at.session_state.authenticated
+    at.run()
+    assert not at.radio
+    assert not at.session_state.authenticated
+    assert not at.exception
+
+
+def test_missing_password_never_opens_workspace(monkeypatch):
+    monkeypatch.delenv('APP_PASSWORD',raising=False)
+    at=AppTest.from_file(APP,default_timeout=30)
+    at.secrets['APP_PASSWORD']='   '
+    at.run()
+    assert any('Password protection is required' in x.value for x in at.error)
+    assert not at.radio
+    assert 'workspace' not in at.session_state
+    assert not at.exception

@@ -52,15 +52,22 @@ def secret(name, default=''):
     except Exception: return os.getenv(name, default)
 
 password = secret('APP_PASSWORD')
-if password and not st.session_state.get('authenticated'):
+if not isinstance(password, str) or not password.strip():
+    st.title('TCC Worship')
+    st.error('Password protection is required. Set APP_PASSWORD in Streamlit Secrets, then restart the app.')
+    st.stop()
+if st.session_state.get('authenticated'):
+    st.session_state.pop('church_login_password',None)
+if not st.session_state.get('authenticated'):
     st.image(str(Path(__file__).parent/'assets/tcc_logo.png'), width=340)
     st.title('TCC Worship')
     st.caption('TABERNACLE CHRISTIAN CENTRE • WORSHIP DESK')
     with st.form('login'):
-        entered=st.text_input('Church access password',type='password')
+        entered=st.text_input('Church access password',type='password',key='church_login_password')
         if st.form_submit_button('Open worship desk',type='primary'):
-            if hmac.compare_digest(entered,password):
-                st.session_state.authenticated=True;st.rerun()
+            if hmac.compare_digest(entered.encode('utf-8'),password.encode('utf-8')):
+                st.session_state.authenticated=True
+                st.rerun()
             else:st.error('Incorrect password.')
     st.stop()
 
