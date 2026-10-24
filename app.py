@@ -12,6 +12,7 @@ from core import (new_workspace, item, duplicate, slides_from_text, search_items
                   backup_bytes, load_backup, media_data, export_html, MAX_BACKUP)
 from bible import BOOKS, load_bible, validate_bible, parse_reference, passage_item
 from song_import import load_bundled_songs, fingerprint
+from saved_services import controls as saved_service_controls, restore_project
 
 st.set_page_config(page_title='TCC Worship | Tabernacle Christian Centre', page_icon='✝', layout='wide')
 st.markdown('''<style>
@@ -60,6 +61,27 @@ if 'workspace' not in st.session_state:
     st.session_state.bibles = [load_bible()]
     st.session_state.verse_history = []
     st.session_state.verse_favourites = []
+pending=st.session_state.pop('pending_saved_service',None)
+if pending:
+    try:
+        if pending['action']=='new':
+            st.session_state.workspace['service']=[]
+            st.session_state.workspace['service_title']='New Worship Service'
+            for key in ('saved_service_id','saved_service_name','saved_service_revision'):
+                st.session_state.pop(key,None)
+            st.session_state.notice='New service started. Your song and media libraries are ready to use.'
+        else:
+            workspace,bibles=restore_project(st.session_state.workspace,pending['project'])
+            st.session_state.workspace=workspace
+            st.session_state.bibles=bibles
+            st.session_state.saved_service_id=pending.get('id')
+            st.session_state.saved_service_name=pending.get('name') or workspace['service_title']
+            st.session_state.saved_service_revision=pending.get('revision')
+            st.session_state.notice='Opened '+st.session_state.saved_service_name+'.'
+        st.session_state.pop('live_desk_html',None)
+        st.session_state.pop('live_desk_signature',None)
+    except (ValueError,KeyError,TypeError) as exc:
+        st.session_state.notice='Could not open the saved preparation: '+str(exc)
 w=st.session_state.workspace
 if 'presenter_session' not in st.session_state:
     st.session_state.presenter_session=os.urandom(12).hex()
@@ -215,10 +237,10 @@ with st.sidebar:
     st.markdown('<div class="eyebrow">TABERNACLE CHRISTIAN CENTRE</div>',unsafe_allow_html=True)
     st.title('TCC Worship')
     st.caption('Prepare with purpose. Present with confidence.')
-    page=st.radio('Workspace',['Overview','Songs & library','Bible desk','Service planner','Media & presentations','Presentation desk','Settings & backups'],label_visibility='collapsed')
+    page=st.radio('Workspace',['Overview','Songs & library','Bible desk','Service planner','Media & presentations','Presentation desk','Saved services','Settings & backups'],label_visibility='collapsed')
     st.divider()
     st.caption(f"{len(w['library'])} library items · {len(w['service'])} service items")
-    st.info('Save a backup before closing. Cloud sessions are temporary; there is no shared database in this first release.')
+    st.info('Use Saved services to keep named preparations in this browser. Download service files or workspace backups to keep a separate copy.')
     if password and st.button('Lock desk'):
         st.session_state.authenticated=False;st.rerun()
 
@@ -426,6 +448,9 @@ elif page=='Service planner':
                 preview(obj)
                 if st.button('Duplicate item',key='dupe'+obj['id']):w['service'].insert(n+1,duplicate(obj));st.rerun()
 
+    with st.expander('Save / open this preparation'):
+        saved_service_controls(w,st.session_state.bibles,'planner')
+
 elif page=='Media & presentations':
     st.write('Build your image and video libraries. Use media as service items or as backgrounds behind lyrics.')
     st.caption('Keep your media collection: Settings & backups → Download workspace backup.')
@@ -470,13 +495,15 @@ elif page=='Presentation desk':
     st.caption('Click Open projector in the live desk to open a separate window. Move it to your extended second display, then click Full screen. Keep this desk open while presenting.')
     if w['service']:
         current_signature=json.dumps({'service':w['service'],'theme':w['theme'],'title':w['service_title'],'bibles':[b.get('id',b['name']) for b in st.session_state.bibles]},sort_keys=True)
-        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=4:
+        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=5:
             st.session_state.live_desk_html=export_html(w,st.session_state.bibles,output_session=st.session_state.presenter_session).decode('utf-8')
             st.session_state.live_desk_signature=current_signature
-            st.session_state.live_desk_version=4
+            st.session_state.live_desk_version=5
         if st.session_state.get('live_desk_signature')!=current_signature:
             st.info('Your service or Bible versions have changed. Click Load / refresh live desk when ready to use the updated service.')
         components.html(st.session_state.live_desk_html,height=1050,scrolling=True)
+        with st.expander('Save / open this prepared presentation'):
+            saved_service_controls(w,st.session_state.bibles,'live')
         st.subheader('Offline presentation')
         st.download_button('Download offline presentation',data=export_html(w, st.session_state.bibles),file_name='TCC_Worship_Live.html',mime='text/html')
         st.caption('For an offline service, download and open this file in Chrome or Edge. It contains the same preview, live output and projector controls.')
@@ -497,6 +524,11 @@ elif page=='Presentation desk':
                         response=r.read(100000).decode('utf-8',errors='replace')
                     st.success('FreeShow accepted the HTTP request.');st.code(response or '(empty response)')
                 except Exception:st.error('Could not complete the FreeShow command. Check the local app, API port and auth key.')
+
+elif page=='Saved services':
+    st.subheader('Prepared presentations and song lists')
+    st.write('Name your preparation and click Save. Choose a saved preparation and click Open to continue with its song list and presentation setup.')
+    saved_service_controls(w,st.session_state.bibles,'library')
 
 elif page=='Settings & backups':
     st.subheader('Presentation theme')
