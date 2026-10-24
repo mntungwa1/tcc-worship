@@ -428,6 +428,7 @@ elif page=='Service planner':
 
 elif page=='Media & presentations':
     st.write('Build your image and video libraries. Use media as service items or as backgrounds behind lyrics.')
+    st.caption('Keep your media collection: Settings & backups → Download workspace backup.')
     images_tab,videos_tab,presentations_tab=st.tabs(['Image library','Video library','Presentations'])
     with images_tab:media_library('image')
     with videos_tab:media_library('video')
