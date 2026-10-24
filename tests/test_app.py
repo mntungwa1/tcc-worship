@@ -6,7 +6,7 @@ APP=str(Path(__file__).resolve().parents[1]/'app.py')
 def test_all_workspaces_render():
     at=AppTest.from_file(APP,default_timeout=30).run()
     assert not at.exception
-    for page in ['Songs & library','Bible desk','Service planner','Media & presentations','Presentation desk','Settings & backups','Overview']:
+    for page in ['Songs & library','Bible desk','Service planner','Media & presentations','Presentation desk','Saved services','Settings & backups','Overview']:
         next(x for x in at.radio if x.label=='Workspace').set_value(page).run()
         assert not at.exception, (page,at.exception)
 
