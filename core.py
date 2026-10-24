@@ -118,13 +118,15 @@ def search_items(library, query='', language='All', favourites=False):
 def media_data(raw, mime):
     return 'data:' + mime + ';base64,' + base64.b64encode(raw).decode()
 
-def export_html(data, bibles=None):
+def export_html(data, bibles=None, output_session=None):
     validate_workspace(data)
     template = Path(__file__).with_name('presenter.html').read_text()
-    payload = json.dumps(data, ensure_ascii=False).replace('<', '\\u003c').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')
+    export_data = {**data, 'presenter_session': output_session or uid()}
+    payload = json.dumps(export_data, ensure_ascii=False).replace('<', '\\u003c').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')
     from bible import load_bible, validate_bible
     versions = bibles if bibles is not None else [load_bible()]
     for version in versions: validate_bible(version)
     bible_payload = json.dumps(versions, ensure_ascii=False).replace('<', '\\u003c')
     logo = media_data(Path(__file__).with_name('assets').joinpath('tcc_logo.png').read_bytes(), 'image/png')
-    return template.replace('/*__TCC_BIBLES__*/', bible_payload).replace('/*__TCC_DATA__*/', payload).replace('__TCC_LOGO__', logo).encode('utf-8')
+    bridge = Path(__file__).with_name('output_bridge.js').read_text()
+    return template.replace('/*__TCC_OUTPUT_BRIDGE__*/', bridge).replace('/*__TCC_BIBLES__*/', bible_payload).replace('/*__TCC_DATA__*/', payload).replace('__TCC_LOGO__', logo).encode('utf-8')
