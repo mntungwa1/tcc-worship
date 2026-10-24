@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
-const {createTccOutputBridge}=require('../output_bridge.js');
+const {createTccOutputBridge,tccBackground}=require('../output_bridge.js');
 
 function environment(){
  const channels=[],windows=new Map();let created=0;
@@ -61,4 +61,31 @@ test('Stage and projector are separate, closed outputs reopen, and sessions stay
  assert.equal(env.created(),2);
  const another=controller(env,'another-church');another.bridge.open(false);assert.equal(env.created(),3);
  const output=[...env.windows.values()][0];output.closed=true;desk.bridge.open(false);assert.equal(env.created(),4);
+});
+
+test('Looping video background is muted and retained when lyric text changes',()=>{
+ const make=tag=>({tagName:tag.toUpperCase(),style:{},className:'',play(){this.plays=(this.plays||0)+1;return Promise.resolve();},getAttribute(name){return this[name];},remove(){this.parentElement.children=this.parentElement.children.filter(x=>x!==this);}});
+ const doc={createElement:make};
+ const root={ownerDocument:doc,children:[],append(child){this.children.push(child);child.parentElement=this;},replaceChildren(){this.children=[];},querySelector(selector){return this.children.find(x=>'.'+x.className===selector)||null;}};
+ const theme={background_media:{kind:'video',src:'data:video/mp4;base64,AAAA'},background_overlay:0.6};
+ tccBackground(root,theme);
+ const video=root.querySelector('.background-media');
+ assert.equal(video.muted,true);assert.equal(video.loop,true);assert.equal(video.autoplay,true);
+ assert.equal(root.querySelector('.background-shade').style.opacity,'0.6');
+ const text=make('div');text.className='words';root.append(text);
+ tccBackground(root,theme);
+ assert.equal(root.querySelector('.background-media'),video);
+ assert.equal(video.plays,1);
+ assert.equal(root.children.includes(text),false);
+ tccBackground(root,{});assert.equal(root.children.length,0);
+});
+
+test('An image background uses cover sizing behind the overlay',()=>{
+ const make=tag=>({tagName:tag.toUpperCase(),style:{},className:'',getAttribute(name){return this[name];},remove(){}});
+ const root={ownerDocument:{createElement:make},children:[],append(x){this.children.push(x);},querySelector(selector){return this.children.find(x=>'.'+x.className===selector);}};
+ tccBackground(root,{background_media:{kind:'image',src:'data:image/png;base64,AAAA'}});
+ assert.equal(root.children[0].tagName,'IMG');
+ assert.equal(root.children[0].style.objectFit,'cover');
+ assert.equal(root.children[0].style.zIndex,'0');
+ assert.equal(root.children[1].style.zIndex,'1');
 });
