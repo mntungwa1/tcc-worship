@@ -11,6 +11,7 @@ import streamlit.components.v1 as components
 from core import (new_workspace, item, duplicate, slides_from_text, search_items,
                   backup_bytes, load_backup, media_data, export_html, MAX_BACKUP)
 from bible import BOOKS, load_bible, validate_bible, parse_reference, passage_item
+from song_import import load_bundled_songs, fingerprint
 
 st.set_page_config(page_title='TCC Worship | Tabernacle Christian Centre', page_icon='✝', layout='wide')
 st.markdown('''<style>
@@ -34,6 +35,7 @@ div[data-testid="stButton"] button,
 div[data-testid="stDownloadButton"] button,
 div[data-testid="stFormSubmitButton"] button{height:auto;min-height:2.5rem}
 .eyebrow{line-height:1.6;overflow-wrap:anywhere}
+
 </style>''', unsafe_allow_html=True)
 
 def secret(name, default=''):
@@ -59,6 +61,20 @@ if 'workspace' not in st.session_state:
     st.session_state.verse_history = []
     st.session_state.verse_favourites = []
 w=st.session_state.workspace
+
+# Seed the supplied collection once per session, including sessions opened before this update.
+if not st.session_state.get('bundled_songs_v1_loaded'):
+    existing_songs={fingerprint(x) for x in w['library'] if x['kind']=='song'}
+    additions=[x for x in load_bundled_songs() if fingerprint(x) not in existing_songs]
+    candidate=copy.deepcopy(w)
+    candidate['library'].extend(additions)
+    if len(candidate['library'])<=1000 and len(backup_bytes(candidate))<=MAX_BACKUP:
+        w['library']=candidate['library']
+        st.session_state.bundled_songs_v1_loaded=True
+    else:
+        st.warning('The included song collection could not fit in this workspace. Save a backup and start a fresh session to load it.')
+
+
 
 def notify(message):
     st.session_state.notice=message
@@ -106,7 +122,7 @@ if page=='Overview':
     st.caption('Start in Songs & library or Bible desk. Add items to Service planner, then use Presentation desk to export and present.')
 
 elif page=='Songs & library':
-    browse,edit=st.tabs(['Find & select','Create / edit'])
+    browse,edit,bulk=st.tabs(['Find & select','Create / edit','Bulk import'])
     with browse:
         cols=st.columns([3,2,1])
         q=cols[0].text_input('Search titles, lyrics and tags')
@@ -141,6 +157,53 @@ elif page=='Songs & library':
                     if original:obj['id']=original['id'];obj['favourite']=original.get('favourite',False);w['library'][w['library'].index(original)]=obj
                     else:w['library'].append(obj)
                     notify('Saved. Existing service copies stay as prepared; add the revised item to use it.')
+
+
+    with bulk:
+        st.write('Import a collection of songs from TXT, HTML or PowerPoint files. Select multiple files, or upload a ZIP containing them.')
+        st.caption('One file becomes one song. Verse/chorus labels and text-file credits are retained. PPTX imports editable text only; save older .ppt files as .pptx first. Review HTML exports for navigation text.')
+        from song_import import import_batch, fingerprint, load_bundled_collection
+        included=load_bundled_collection()
+        st.caption(f"Included hymn collection: {len(included['songs'])} songs. {len(included['skipped'])} source files held out for review.")
+        with st.expander('Files excluded from the included collection'):
+            st.dataframe(included['skipped'],hide_index=True,width='stretch')
+        uploads=st.file_uploader('Song files or ZIP collections',type=['txt','html','htm','pptx','ppt','zip'],accept_multiple_files=True,key='song_uploads')
+        if st.button('Read files and preview songs',disabled=not uploads,type='primary'):
+            try:
+                if sum(f.size for f in uploads)>40*1024*1024:
+                    raise ValueError('Select at most 40 MB per batch.')
+                songs,errors=import_batch([(f.name,f.getvalue()) for f in uploads])
+                st.session_state.song_import_preview={'songs':songs,'errors':errors}
+            except Exception as exc:
+                st.session_state.pop('song_import_preview',None)
+                st.error(str(exc))
+        batch=st.session_state.get('song_import_preview')
+        if batch is not None:
+            songs=batch['songs']
+            existing={fingerprint(x) for x in w['library'] if x['kind']=='song'}
+            pending=[x for x in songs if fingerprint(x) not in existing]
+            st.info(f"{len(songs)} unique songs read · {len(pending)} new · {len(songs)-len(pending)} already in your library.")
+            if batch['errors']:
+                st.warning(f"{len(batch['errors'])} files could not be imported. Details below.")
+                st.dataframe(batch['errors'],hide_index=True,width='stretch')
+            if songs:
+                st.dataframe([{'Title':x['title'],'Slides':len(x['slides']),'Source':x.get('import_source',''),'Status':'Already in library' if fingerprint(x) in existing else 'New'} for x in songs],hide_index=True,width='stretch')
+                sample=st.selectbox('Preview an imported song',range(len(songs)),format_func=lambda i:songs[i]['title'],key='import_song_preview')
+                preview(songs[sample])
+                if songs[sample].get('credit'):
+                    st.caption(songs[sample]['credit'])
+                confirm_import=st.checkbox('I have reviewed the preview and want to add all new songs',key='confirm_song_import')
+                if st.button(f'Import {len(pending)} new songs to library',disabled=not(pending and confirm_import),type='primary'):
+                    try:
+                        candidate=copy.deepcopy(w)
+                        candidate['library'].extend(copy.deepcopy(pending))
+                        if len(backup_bytes(candidate))>MAX_BACKUP:
+                            raise ValueError('The workspace would exceed 45 MB. Import a smaller batch.')
+                        w['library']=candidate['library']
+                        notify(f'Imported {len(pending)} songs. Download a workspace backup in Settings & backups to keep them.')
+                    except ValueError as exc:
+                        st.error(str(exc))
+            st.caption('Imports stay in this session. Download a workspace backup after importing, and restore it next time.')
 
 elif page=='Bible desk':
     st.caption('Holyrics-inspired Bible workspace • verse list on the left • book, chapter and verse grids on the right')
