@@ -3,6 +3,7 @@ import base64
 import copy
 import json
 import re
+import textwrap
 import uuid
 from pathlib import Path
 
@@ -29,6 +30,35 @@ def item(title, kind, text='', **kwargs):
     return {'id': uid(), 'title': title, 'kind': kind,
             'slides': slides_from_text(text), 'language': '', 'tags': '',
             'credit': '', 'favourite': False, **kwargs}
+
+
+def presentation_item(obj, line_width=44, lines_per_slide=2):
+    """Lay out song lyrics without modifying the saved song or crossing verse boundaries."""
+    result = copy.deepcopy(obj)
+    if obj['kind'] != 'song':
+        return result
+    wrapper = textwrap.TextWrapper(width=line_width, break_long_words=False,
+                                   break_on_hyphens=False, replace_whitespace=True)
+    prepared = []
+    for number, source in enumerate(obj['slides'], 1):
+        if source.get('src'):
+            prepared.append(copy.deepcopy(source))
+            continue
+        parts = []
+        for paragraph in re.split(r'\n\s*\n', source.get('text','').strip()):
+            for sentence in re.split(r'(?<=[.!?])\s+', paragraph):
+                lines = []
+                for line in sentence.splitlines():
+                    lines.extend(wrapper.wrap(line.strip()))
+                parts.extend('\n'.join(lines[i:i+lines_per_slide])
+                             for i in range(0,len(lines),lines_per_slide))
+        label = source.get('label') or f'Verse {number}'
+        for index, text in enumerate(parts, 1):
+            prepared.append({**source, 'text':text,
+                             'label':label if len(parts)==1 else f'{label} · {index}/{len(parts)}',
+                             'source_label':label})
+    result['slides'] = prepared
+    return result
 
 def new_workspace():
     logo = item('Tabernacle Christian Centre', 'image', src=media_data(Path(__file__).with_name('assets').joinpath('tcc_logo.png').read_bytes(), 'image/png'))
@@ -121,7 +151,9 @@ def media_data(raw, mime):
 def export_html(data, bibles=None, output_session=None):
     validate_workspace(data)
     template = Path(__file__).with_name('presenter.html').read_text()
-    export_data = {**data, 'presenter_session': output_session or uid()}
+    export_data = {**data, 'presenter_session': output_session or uid(),
+                   'service':[presentation_item(obj) for obj in data['service']]}
+    validate_workspace(export_data)
     payload = json.dumps(export_data, ensure_ascii=False).replace('<', '\\u003c').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')
     from bible import load_bible, validate_bible
     versions = bibles if bibles is not None else [load_bible()]
