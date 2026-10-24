@@ -27,13 +27,13 @@ let previewIndex=0,previewSlide=0,state={item:0,slide:0,blank:true};
 $('title').textContent=DATA.service_title;document.documentElement.style.setProperty('--gold',DATA.theme.accent);
 function count(i){return Math.max(1,service[i]?.slides.length||0)}
 function content(target,itemIndex,slideIndex,blank,preview=false){
- target.replaceChildren();target.style.background=DATA.theme.background;
- if(blank||!service[itemIndex])return;
+ target.style.background=DATA.theme.background;
+ if(blank||!service[itemIndex]){target.replaceChildren();return;}
  const item=service[itemIndex],slide=item.slides[slideIndex]||{};
  if(item.kind==='video'){
-  const v=document.createElement('video');v.src=item.src;v.controls=true;v.loop=false;v.muted=preview;target.append(v);
- }else if(item.kind==='image'||slide.src){const im=document.createElement('img');im.src=slide.src||item.src;im.alt=item.title;target.append(im)}
- else{const t=document.createElement('div');t.className='words';t.textContent=slide.text||'';t.style.fontSize=`clamp(18px, ${DATA.theme.font_size/14}vw, ${DATA.theme.font_size}px)`;target.append(t);const c=document.createElement('div');c.className='credit';c.textContent=item.credit||'';target.append(c);requestAnimationFrame(()=>fitText(t))}
+  target.replaceChildren();const v=document.createElement('video');v.className='foreground-video';v.src=item.src;v.controls=true;v.loop=false;v.muted=preview;target.append(v);
+ }else if(item.kind==='image'||slide.src){target.replaceChildren();const im=document.createElement('img');im.src=slide.src||item.src;im.alt=item.title;target.append(im)}
+ else{tccBackground(target,DATA.theme);const t=document.createElement('div');t.className='words';t.style.position='relative';t.style.zIndex='2';t.textContent=slide.text||'';t.style.fontSize=`clamp(18px, ${DATA.theme.font_size/14}vw, ${DATA.theme.font_size}px)`;target.append(t);const c=document.createElement('div');c.className='credit';c.style.zIndex='3';c.textContent=item.credit||'';target.append(c);requestAnimationFrame(()=>fitText(t))}
 }
 function fitText(el){if(!el.isConnected||!el.parentElement)return;let size=Math.min(DATA.theme.font_size,el.parentElement.clientWidth/15);el.style.fontSize=size+'px';while(size>14&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)){el.style.fontSize=(--size)+'px'}}
 function outputPacket(){
@@ -78,7 +78,7 @@ function chooseBook(book){bibleBook=book;bibleChapter=Object.keys(bible().books[
 function selectVerse(n){if($('multi-verse').checked){bibleSelected=bibleSelected.includes(n)?bibleSelected.filter(v=>v!==n):[...bibleSelected,n];if(!bibleSelected.length)bibleSelected=[n]}else bibleSelected=[n];renderBible()}
 function makeBibleItem(){const ns=[...bibleSelected].sort((a,b)=>a-b);return {id:'bible-'+Date.now()+'-'+Math.random(),kind:'scripture',title:`${bibleBook} ${bibleChapter}:${ns.join(',')}`,credit:bible().credit||bible().name,slides:ns.map(n=>({label:`${bibleBook} ${bibleChapter}:${n}`,text:bible().books[bibleBook][bibleChapter][n]+'\n\n'+`${bibleBook} ${bibleChapter}:${n}`}))}}
 function biblePreview(){
- const obj=makeBibleItem();const root=$('bible-preview');root.replaceChildren();root.style.background=DATA.theme.background;const text=document.createElement('div');text.className='words';text.textContent=obj.slides[0].text;root.append(text);const credit=document.createElement('div');credit.className='credit';credit.textContent=obj.credit;root.append(credit);requestAnimationFrame(()=>fitText(text));
+ const obj=makeBibleItem();const root=$('bible-preview');tccBackground(root,DATA.theme);root.style.background=DATA.theme.background;const text=document.createElement('div');text.className='words';text.style.position='relative';text.style.zIndex='2';text.textContent=obj.slides[0].text;root.append(text);const credit=document.createElement('div');credit.className='credit';credit.style.zIndex='3';credit.textContent=obj.credit;root.append(credit);requestAnimationFrame(()=>fitText(text));
 }
 function renderBible(){
  $('bible-heading').textContent=`${bibleBook} ${bibleChapter}`;
