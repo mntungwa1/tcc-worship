@@ -371,16 +371,22 @@ elif page=='Media & presentations':
             except Exception as exc:st.error(f'Could not import: {exc}')
 
 elif page=='Presentation desk':
-    st.subheader('Ready for the projector')
-    st.write('Download the offline presentation, open it on the church laptop in Chrome or Edge, and click **Open projector**. Move that window to the projector screen and select **Full screen**.')
+    st.subheader('Live presentation desk')
+    st.write('Select an item in the order of service below. The left screen is your preview; press **Go live** to send it to the congregation screen on the right.')
+    st.caption('Click Open projector in the live desk to open a separate window. Move it to your extended second display, then click Full screen. Keep this desk open while presenting.')
     if w['service']:
-        st.download_button('Download offline presentation',data=export_html(w, st.session_state.bibles),file_name='TCC_Worship_Live.html',mime='text/html',type='primary')
-        st.caption('Includes this service and its embedded media. No internet connection is required. The exported controller must remain open.')
-        idx=st.selectbox('Preview service item',range(len(w['service'])),format_func=lambda i:w['service'][i]['title'])
-        obj=w['service'][idx]
-        slide=st.slider('Preview slide',1,max(2,len(obj['slides'])),1) if len(obj['slides'])>1 else 1
-        preview(obj,min(slide-1,max(0,len(obj['slides'])-1)),height=400)
-    else:st.info('Your service is empty. Add some items before exporting.')
+        current_signature=json.dumps({'service':w['service'],'theme':w['theme'],'title':w['service_title'],'bibles':[b.get('id',b['name']) for b in st.session_state.bibles]},sort_keys=True)
+        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state:
+            st.session_state.live_desk_html=export_html(w,st.session_state.bibles).decode('utf-8')
+            st.session_state.live_desk_signature=current_signature
+        if st.session_state.get('live_desk_signature')!=current_signature:
+            st.info('Your service or Bible versions have changed. Click Load / refresh live desk when ready to use the updated service.')
+        components.html(st.session_state.live_desk_html,height=1050,scrolling=True)
+        st.subheader('Offline presentation')
+        st.download_button('Download offline presentation',data=export_html(w, st.session_state.bibles),file_name='TCC_Worship_Live.html',mime='text/html')
+        st.caption('For an offline service, download and open this file in Chrome or Edge. It contains the same preview, live output and projector controls.')
+    else:
+        st.info('Your service is empty. Add songs, scripture or media in Service planner first.')
     with st.expander('Optional FreeShow local controls — experimental'):
         st.write('Requires this Streamlit app and FreeShow to run on the same computer. Enable the REST API in FreeShow Connections. These controls have not been tested against a running FreeShow installation.')
         if secret('TCC_LOCAL_MODE')!='1':st.info('Local controls are disabled. Start locally with TCC_LOCAL_MODE=1 to enable them.')
