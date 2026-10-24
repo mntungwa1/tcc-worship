@@ -93,6 +93,36 @@ def preview(obj, slide=0, height=260):
     credit=html.escape(obj.get('credit',''))
     components.html(f'''<div style="box-sizing:border-box;height:{height-10}px;background:{w['theme']['background']};color:white;font:clamp(18px,2.2vw,30px)/1.35 Arial;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border:1px solid #34435c;border-radius:10px;padding:20px;overflow:auto"><div>{text}</div><div style="font-size:11px;color:#acb8cd;margin-top:16px">{credit}</div></div>''',height=height)
 
+
+@st.cache_data(ttl=86400, max_entries=12, show_spinner=False)
+def cached_bible_version(version_id):
+    from bible_catalogue import fetch_translation
+    return fetch_translation(version_id)
+
+def bible_catalogue_controls():
+    from bible_catalogue import load_catalogue
+    catalogue=load_catalogue()
+    with st.expander(f'Browse {len(catalogue)} free Bible versions'):
+        st.caption('Twelve selected English translations. Add the versions you use; internet is needed for the first download. Save Bible JSON to retain a version across sessions, or include it in an offline presentation.')
+        purposes={'BSB':'Modern English for everyday reading and projection.','eng_kjv':'Traditional English.','eng_web':'Modern English, public domain.','eng_asv':'Classic formal translation.','eng_bbe':'Simpler English vocabulary.','eng_fbv':'Readable contemporary English.','eng_dby':'A close, literal translation.','eng_ylt':'A very literal study translation.','eng_rv5':'Historic revision for comparison.','eng_wbs':"Webster’s revision of traditional English wording.",'eng_gnv':'Historic Reformation translation.','eng_lsv':'Modern literal translation.'}
+        selected=st.selectbox('Add a Bible version',range(len(catalogue)),format_func=lambda i:f"{catalogue[i]['englishName']} · {catalogue[i]['shortName']}",key='catalogue_version')
+        entry=catalogue[selected]
+        st.write(purposes.get(entry['id'],''))
+        rights=entry['license']
+        st.caption(('Public domain' if rights['publicDomain'] else 'Open licence — attribution retained')+f" · {entry['numberOfBooks']} books")
+        st.link_button('View source and licence',entry['licenseUrl'])
+        present=any(x.get('id')==entry['id'] or (entry['id']=='eng_web' and not x.get('id') and x['name'].startswith('World English Bible')) for x in st.session_state.bibles)
+        if st.button('Add version to Bible desk',disabled=present,type='primary',key='catalogue_add'):
+            try:
+                with st.spinner('Downloading and checking the selected Bible version…'):
+                    downloaded=cached_bible_version(entry['id'])
+                st.session_state.bibles.append(downloaded)
+                notify(downloaded['name']+' added. Select it in the Bible version dropdown.')
+            except Exception as exc:
+                st.error('Could not add this version: '+str(exc))
+        if present:
+            st.success('This version is already available in the Bible version dropdown.')
+
 with st.sidebar:
     st.image(str(Path(__file__).parent/'assets/tcc_logo.png'),width='stretch')
     st.markdown('<div class="eyebrow">TABERNACLE CHRISTIAN CENTRE</div>',unsafe_allow_html=True)
@@ -207,9 +237,14 @@ elif page=='Songs & library':
 
 elif page=='Bible desk':
     st.caption('Holyrics-inspired Bible workspace • verse list on the left • book, chapter and verse grids on the right')
+    bible_catalogue_controls()
     versions=st.session_state.bibles
     vi=st.selectbox('Bible version',range(len(versions)),format_func=lambda i:versions[i]['name'])
     bible=versions[vi]
+    if bible.get('license_notice'):
+        with st.expander('Translation attribution and licence'):
+            st.text(bible['license_notice'])
+    st.download_button('Download selected Bible JSON',json.dumps(bible,ensure_ascii=False).encode('utf-8'),file_name='TCC_Bible_'+str(bible.get('id','WEB'))+'.json',mime='application/json')
     with st.form('reference'):
         a,b=st.columns([5,1])
         ref=a.text_input('Quick reference',placeholder='John 3:16-18 or Psalms 23:1-6')
@@ -380,6 +415,7 @@ elif page=='Settings & backups':
             notify('Workspace restored.')
         except ValueError as exc:st.error(str(exc))
     st.subheader('Additional Bible versions')
+    st.info('Open Bible desk → Browse free Bible versions to add translations by language. Download Bible JSON to retain added versions across sessions.')
     st.caption('WEB is included offline. Import additional versions that you are authorised to use. Bible imports and verse favourites are session-only; save your Bible source files separately.')
     st.code('{"name":"Version name","credit":"Required attribution","books":{"John":{"3":{"16":"Verse text"}}}}',language='json')
     bf=st.file_uploader('Import authorised Bible JSON',type=['json'],key='bible_import')
