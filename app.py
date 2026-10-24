@@ -47,6 +47,8 @@ div[data-testid="stFormSubmitButton"] button{height:auto;min-height:2.5rem}
 
 </style>''', unsafe_allow_html=True)
 
+st.caption('Developed by Dingaan Mahlangu')
+
 def secret(name, default=''):
     try: return st.secrets.get(name, os.getenv(name, default))
     except Exception: return os.getenv(name, default)
