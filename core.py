@@ -82,6 +82,16 @@ def validate_workspace(data):
             raise ValueError('Theme colours must be six-digit hex colours.')
     if type(theme.get('font_size')) is not int or not 24 <= theme['font_size'] <= 90:
         raise ValueError('Font size must be between 24 and 90.')
+    backdrop=theme.get('background_media')
+    if backdrop is not None:
+        if not isinstance(backdrop,dict) or backdrop.get('kind') not in ('image','video'):
+            raise ValueError('Background must be an image or video.')
+        validate_media(backdrop.get('src',''),backdrop['kind'])
+        if not isinstance(backdrop.get('name',''),str):
+            raise ValueError('Invalid background name.')
+    overlay=theme.get('background_overlay',0.45)
+    if type(overlay) not in (int,float) or not 0<=overlay<=0.9:
+        raise ValueError('Background darkening must be between 0 and 90 percent.')
     for name in ('library', 'service'):
         if not isinstance(data.get(name), list) or len(data[name]) > 1000:
             raise ValueError('Invalid library or service list.')
