@@ -61,6 +61,8 @@ if 'workspace' not in st.session_state:
     st.session_state.verse_history = []
     st.session_state.verse_favourites = []
 w=st.session_state.workspace
+if 'presenter_session' not in st.session_state:
+    st.session_state.presenter_session=os.urandom(12).hex()
 
 # Seed the supplied collection once per session, including sessions opened before this update.
 if not st.session_state.get('bundled_songs_v1_loaded'):
@@ -376,9 +378,10 @@ elif page=='Presentation desk':
     st.caption('Click Open projector in the live desk to open a separate window. Move it to your extended second display, then click Full screen. Keep this desk open while presenting.')
     if w['service']:
         current_signature=json.dumps({'service':w['service'],'theme':w['theme'],'title':w['service_title'],'bibles':[b.get('id',b['name']) for b in st.session_state.bibles]},sort_keys=True)
-        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state:
-            st.session_state.live_desk_html=export_html(w,st.session_state.bibles).decode('utf-8')
+        if st.button('Load / refresh live desk',type='primary') or 'live_desk_html' not in st.session_state or st.session_state.get('live_desk_version')!=2:
+            st.session_state.live_desk_html=export_html(w,st.session_state.bibles,output_session=st.session_state.presenter_session).decode('utf-8')
             st.session_state.live_desk_signature=current_signature
+            st.session_state.live_desk_version=2
         if st.session_state.get('live_desk_signature')!=current_signature:
             st.info('Your service or Bible versions have changed. Click Load / refresh live desk when ready to use the updated service.')
         components.html(st.session_state.live_desk_html,height=1050,scrolling=True)
