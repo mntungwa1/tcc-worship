@@ -53,6 +53,7 @@ const outputBridge=createTccOutputBridge({
  session:DATA.presenter_session||'offline',
  css:document.querySelector('style').textContent,
  getPacket:outputPacket,
+ getWorkspace:()=>({service,theme:DATA.theme,service_title:DATA.service_title,bibles:BIBLES}),
  onError:message=>{ $('projector-status').textContent=message; },
  onStatus:connected=>{ $('projector-status').textContent=connected?'Projector connected — Go live updates the same window.':'Projector disconnected — click Open projector once.'; },
  onNavigate:action=>{if(action==='next')move(1);if(action==='previous')move(-1);if(action==='blackout'){state.blank=!state.blank;send();}},
