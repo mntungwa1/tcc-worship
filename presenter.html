@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TCC Worship • Live</title>
+<style>
+:root{color-scheme:dark;--gold:#e8bc73;--navy:#0b1322}*{box-sizing:border-box}body{margin:0;background:var(--navy);color:#f4f6fb;font:16px system-ui,sans-serif}header{padding:22px 28px;border-bottom:1px solid #283348;display:flex;align-items:center;justify-content:space-between}h1{font-size:24px;margin:0}small,.muted{color:#a8b5c9}main{display:grid;grid-template-columns:290px 1fr;min-height:calc(100vh - 80px)}aside{padding:20px;border-right:1px solid #283348;overflow:auto;max-height:90vh}.workspace{padding:24px}button,input{font:inherit}button{background:#1c2a40;color:white;border:1px solid #3b4961;border-radius:9px;padding:11px 15px;cursor:pointer}button:hover{border-color:var(--gold)}button.active{background:#6b512e;border-color:var(--gold)}.primary{background:var(--gold);color:#131a24;font-weight:700}aside button{display:block;width:100%;text-align:left;margin:8px 0}.controls{display:flex;flex-wrap:wrap;gap:9px;margin:16px 0}.screen{aspect-ratio:16/9;position:relative;background:#101d35;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:12px}.words{height:100%;display:flex;align-items:center;justify-content:center;white-space:pre-wrap;text-align:center;font-size:54px;line-height:1.3;padding:6%;width:100%;overflow:hidden;text-shadow:0 2px 6px #0006}.credit{position:absolute;bottom:12px;left:3%;right:3%;font-size:14px;text-align:center;color:#d4d9e2}.screen img,.screen video{width:100%;height:100%;object-fit:contain}.slide-grid{display:flex;gap:8px;flex-wrap:wrap}.slide-grid button{max-width:220px}.status{color:var(--gold);margin:12px 0}.stage{font-size:clamp(32px,5vw,76px);padding:7%;white-space:pre-wrap}.stage small{display:block;font-size:24px;margin-top:35px}.output-mode main,.stage-mode main{display:block}.output-mode header,.output-mode aside,.output-mode .workspace,.stage-mode header,.stage-mode aside,.stage-mode .workspace{display:none}#external{display:none}.output-mode #external{display:flex;width:100vw;height:100vh;border-radius:0;aspect-ratio:auto}.stage-mode #stage{display:block}.output-mode .words{font-size:clamp(28px,4vw,80px)}#stage{display:none}#output-tools{position:fixed;top:10px;right:10px;z-index:10;opacity:.15}#output-tools:hover{opacity:1}@media(max-width:800px){main{grid-template-columns:1fr}aside{max-height:230px;border-right:0}.words{font-size:28px}header{padding:16px}.workspace{padding:12px}}
+
+nav{display:flex;gap:8px;padding:12px 28px;border-bottom:1px solid #283348}.bible-panel{display:none;padding:22px 28px}.bible-mode main{display:none}.bible-mode .bible-panel{display:block}.bible-desk{display:grid;grid-template-columns:1.1fr 1fr;gap:24px}.bible-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}.bible-grid button{padding:8px 3px;font-size:13px;border-radius:5px}.bible-grid.numbers{grid-template-columns:repeat(12,1fr);max-height:150px;overflow:auto}.bible-grid.books{max-height:330px;overflow:auto}.bible-grid .ot{background:#28334c}.bible-grid .nt{background:#193d43}.bible-grid button.active{background:#806136}.verse-list{height:280px;overflow:auto;background:#111e32;border:1px solid #34435c;border-radius:9px;padding:8px}.verse-list button{display:block;width:100%;text-align:left;border:0;background:transparent;line-height:1.6;margin-bottom:4px}.verse-list button.active{background:#314761}.bible-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}.bible-bar input,.bible-bar select{background:#17253b;border:1px solid #42516d;color:white;border-radius:7px;padding:10px;font:inherit}.bible-bar input{flex:1;min-width:180px}.bible-panel h2{margin:12px 0}.bible-panel h3{font-size:12px;letter-spacing:1px;color:#e8bc73}.bible-preview{aspect-ratio:16/9;margin-top:14px}.output-mode nav,.stage-mode nav{display:none}@media(max-width:800px){.bible-desk{grid-template-columns:1fr}.bible-panel{padding:12px}.bible-grid{grid-template-columns:repeat(4,1fr)}}
+</style></head><body>
+<header><img src="__TCC_LOGO__" alt="Tabernacle Christian Centre" style="width:150px;height:85px;object-fit:contain;background:white;border-radius:8px;margin-right:18px"><div style="flex:1"><small>TCC WORSHIP / PRESENTATION DESK</small><h1 id="title"></h1></div><button class="primary" id="open">Open projector ↗</button></header>
+<nav><button id="service-tab" class="active">Service desk</button><button id="bible-tab">Holy Bible</button></nav>
+<section class="bible-panel"><div class="bible-bar"><select id="bible-version" aria-label="Bible version"></select><input id="bible-ref" placeholder="Quick reference: John 3:16-18" aria-label="Quick reference"><button id="bible-find" class="primary">Find passage</button></div><div class="bible-desk"><section><h2 id="bible-heading"></h2><label><input id="multi-verse" type="checkbox"> Select multiple verses</label><div id="verse-list" class="verse-list"></div><div class="screen bible-preview" id="bible-preview"></div><div class="controls"><button id="bible-live" class="primary">Go live with passage</button><button id="bible-add">Add to service</button><button id="bible-prev">← Live previous</button><button id="bible-next">Live next →</button><button id="bible-blank">Blackout</button></div><p class="status" id="bible-status" aria-live="polite"></p></section><section><h3>BOOKS · OLD TESTAMENT / NEW TESTAMENT</h3><div id="bible-books" class="bible-grid books"></div><h3>CHAPTERS</h3><div id="bible-chapters" class="bible-grid numbers"></div><h3>VERSES</h3><div id="bible-verses" class="bible-grid numbers"></div><h3>SEARCH THIS BIBLE</h3><div class="bible-bar"><input id="bible-search" placeholder="Search a word or phrase" aria-label="Search Bible"><button id="bible-search-go">Search</button></div><div id="bible-results" class="verse-list"></div></section></div></section>
+<main><aside><small>ORDER OF SERVICE</small><div id="items"></div><p class="muted">Select an item to preview, then press Go live. Arrow keys move live slides. B toggles blackout.</p></aside><section class="workspace"><small>PREVIEW</small><div class="screen" id="preview"></div><div id="slides" class="slide-grid controls"></div><button class="primary" id="go">Go live</button><div class="controls"><button id="prev">← Previous</button><button id="next">Next →</button><button id="blank">Blackout · B</button><button id="play">Play / Pause video</button><button id="restart">Restart video</button><button id="stageopen">Open stage ↗</button></div><p class="status" id="status" aria-live="polite"></p><small>LIVE OUTPUT</small><div id="live" class="screen"></div><p class="muted">Move the projector window to the second screen and use its Full screen button. For video with sound, click Enable sound in that window once. MP4 playback depends on the browser codec.</p></section></main>
+<div id="external" class="screen"></div><div id="stage" class="stage"></div>
+<script>
+'use strict';
+const DATA=/*__TCC_DATA__*/;
+const BIBLES=/*__TCC_BIBLES__*/;
+const $=id=>document.getElementById(id), service=DATA.service;
+let previewIndex=0,previewSlide=0,state={item:0,slide:0,blank:true},projector=null,stageWindow=null;
+$('title').textContent=DATA.service_title;document.documentElement.style.setProperty('--gold',DATA.theme.accent);
+function count(i){return Math.max(1,service[i]?.slides.length||0)}
+function content(target,itemIndex,slideIndex,blank,preview=false){
+ target.replaceChildren();target.style.background=DATA.theme.background;
+ if(blank||!service[itemIndex])return;
+ const item=service[itemIndex],slide=item.slides[slideIndex]||{};
+ if(item.kind==='video'){
+  const v=document.createElement('video');v.src=item.src;v.controls=true;v.loop=false;v.muted=preview;target.append(v);
+ }else if(item.kind==='image'||slide.src){const im=document.createElement('img');im.src=slide.src||item.src;im.alt=item.title;target.append(im)}
+ else{const t=document.createElement('div');t.className='words';t.textContent=slide.text||'';t.style.fontSize=`clamp(18px, ${DATA.theme.font_size/14}vw, ${DATA.theme.font_size}px)`;target.append(t);const c=document.createElement('div');c.className='credit';c.textContent=item.credit||'';target.append(c);requestAnimationFrame(()=>fitText(t))}
+}
+function fitText(el){if(!el.isConnected||!el.parentElement)return;let size=Math.min(DATA.theme.font_size,el.parentElement.clientWidth/15);el.style.fontSize=size+'px';while(size>14&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)){el.style.fontSize=(--size)+'px'}}
+function stageRender(doc){
+ const root=doc.getElementById('stage');root.replaceChildren();
+ const current=service[state.item],s=current?.slides[state.slide];
+ const title=doc.createElement('small');title.textContent=`${DATA.service_title} • ${new Date().toLocaleTimeString()}${state.blank?' • BLACKOUT':''}`;root.append(title);
+ const body=doc.createElement('div');body.textContent=s?.text||current?.title||'Ready';root.append(body);
+ const next=doc.createElement('small');next.textContent='NEXT: '+(current?.slides[state.slide+1]?.text||service[state.item+1]?.title||'End of service');root.append(next);
+}
+function send(){
+ content($('live'),state.item,state.slide,state.blank,true);
+ if(projector&&!projector.closed){content(projector.document.getElementById('external'),state.item,state.slide,state.blank,false)}
+ if(stageWindow&&!stageWindow.closed)stageRender(stageWindow.document);
+ $('bible-status').textContent=state.blank?'OUTPUT BLACKED OUT':`LIVE: ${service[state.item]?.title||'Ready'} • Slide ${state.slide+1}`;
+ $('status').textContent=state.blank?'OUTPUT BLACKED OUT':`LIVE: ${service[state.item]?.title||'Empty service'} • ${state.slide+1}/${count(state.item)}`;
+}
+function preview(){content($('preview'),previewIndex,previewSlide,false,true);$('slides').replaceChildren();const obj=service[previewIndex];for(let s=0;s<count(previewIndex)&&obj;s++){const b=document.createElement('button');b.textContent=obj.slides[s]?.label||`Slide ${s+1}`;b.className=s===previewSlide?'active':'';b.onclick=()=>{previewSlide=s;preview()};$('slides').append(b)}}
+function move(delta){if(!service.length)return;let i=state.item,s=state.slide+delta;if(s>=count(i)){if(i>=service.length-1)return;i++;s=0}if(s<0){if(i<=0)return;i--;s=count(i)-1}state={item:i,slide:s,blank:false};previewIndex=i;previewSlide=s;preview();send()}
+function openWindow(stage){
+ const w=window.open('','_blank','popup,width=1280,height=720');if(!w){alert('Allow pop-ups to open the projector or stage window.');return null}
+ // A direct window reference keeps file:// exports functional without cross-tab storage.
+ w.document.write('<!doctype html><html><head><title>TCC Worship</title><style>'+document.querySelector('style').textContent+'</style></head><body class="'+(stage?'stage-mode':'output-mode')+'"><div id="external" class="screen"></div><div id="stage" class="stage"></div><div id="output-tools"><button id="full">Full screen</button><button id="sound">Enable sound / Play</button></div></body></html>');w.document.close();
+ w.document.getElementById('full').onclick=()=>w.document.documentElement.requestFullscreen().catch(()=>{});
+ w.document.getElementById('sound').onclick=()=>{const v=w.document.querySelector('video');if(v){v.muted=false;v.play().catch(()=>{})}};
+ w.addEventListener('keydown',keys);w.addEventListener('resize',()=>w.document.querySelectorAll('.words').forEach(fitText));return w;
+}
+function keys(e){if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();move(1)}if(e.key==='ArrowLeft'){e.preventDefault();move(-1)}if(e.key.toLowerCase()==='b'){state.blank=!state.blank;send()}}
+$('open').onclick=()=>{projector=openWindow(false);send()};$('stageopen').onclick=()=>{stageWindow=openWindow(true);send()};
+$('go').onclick=()=>{state={item:previewIndex,slide:previewSlide,blank:false};send()};$('next').onclick=()=>move(1);$('prev').onclick=()=>move(-1);$('blank').onclick=()=>{state.blank=!state.blank;send()};
+$('play').onclick=()=>{const v=projector&&!projector.closed?projector.document.querySelector('video'):null;if(v){if(v.paused)v.play().catch(()=>alert('Click Enable sound / Play in the projector window.'));else v.pause()}else alert('Open the projector and send a video live first.')};
+$('restart').onclick=()=>{const v=projector&&!projector.closed?projector.document.querySelector('video'):null;if(v)v.currentTime=0};
+function refreshItems(){$('items').replaceChildren();service.forEach((obj,i)=>{const b=document.createElement('button');b.textContent=`${i+1}. ${obj.title}`;b.onclick=()=>{previewIndex=i;previewSlide=0;preview()};$('items').append(b)});}
+refreshItems();
+window.addEventListener('resize',()=>document.querySelectorAll('.words').forEach(fitText));window.addEventListener('keydown',keys);setInterval(()=>{if(stageWindow&&!stageWindow.closed)stageRender(stageWindow.document)},1000);preview();send();
+
+let bibleIndex=0,bibleBook=Object.keys(BIBLES[0].books)[0],bibleChapter='1',bibleSelected=[1];
+function bible(){return BIBLES[bibleIndex]}
+function bibleNumbers(){return Object.keys(bible().books[bibleBook][bibleChapter]).map(Number).sort((a,b)=>a-b)}
+function chooseBook(book){bibleBook=book;bibleChapter=Object.keys(bible().books[book]).sort((a,b)=>+a-+b)[0];bibleSelected=[bibleNumbers()[0]];renderBible()}
+function selectVerse(n){if($('multi-verse').checked){bibleSelected=bibleSelected.includes(n)?bibleSelected.filter(v=>v!==n):[...bibleSelected,n];if(!bibleSelected.length)bibleSelected=[n]}else bibleSelected=[n];renderBible()}
+function makeBibleItem(){const ns=[...bibleSelected].sort((a,b)=>a-b);return {id:'bible-'+Date.now()+'-'+Math.random(),kind:'scripture',title:`${bibleBook} ${bibleChapter}:${ns.join(',')}`,credit:bible().credit||bible().name,slides:ns.map(n=>({label:`${bibleBook} ${bibleChapter}:${n}`,text:bible().books[bibleBook][bibleChapter][n]+'\n\n'+`${bibleBook} ${bibleChapter}:${n}`}))}}
+function biblePreview(){
+ const obj=makeBibleItem();const root=$('bible-preview');root.replaceChildren();root.style.background=DATA.theme.background;const text=document.createElement('div');text.className='words';text.textContent=obj.slides[0].text;root.append(text);const credit=document.createElement('div');credit.className='credit';credit.textContent=obj.credit;root.append(credit);requestAnimationFrame(()=>fitText(text));
+}
+function renderBible(){
+ $('bible-heading').textContent=`${bibleBook} ${bibleChapter}`;
+ $('bible-books').replaceChildren();Object.keys(bible().books).forEach((b,i)=>{const el=document.createElement('button');el.textContent=b;el.className=(i<39?'ot':'nt')+(b===bibleBook?' active':'');el.onclick=()=>chooseBook(b);$('bible-books').append(el)});
+ $('bible-chapters').replaceChildren();Object.keys(bible().books[bibleBook]).sort((a,b)=>+a-+b).forEach(c=>{const el=document.createElement('button');el.textContent=c;el.className=c===bibleChapter?'active':'';el.onclick=()=>{bibleChapter=c;bibleSelected=[bibleNumbers()[0]];renderBible()};$('bible-chapters').append(el)});
+ $('bible-verses').replaceChildren();$('verse-list').replaceChildren();bibleNumbers().forEach(n=>{const el=document.createElement('button');el.textContent=n;el.className=bibleSelected.includes(n)?'active':'';el.onclick=()=>selectVerse(n);$('bible-verses').append(el);const verse=document.createElement('button');verse.textContent=n+'. '+bible().books[bibleBook][bibleChapter][n];verse.className=el.className;verse.onclick=()=>selectVerse(n);$('verse-list').append(verse)});biblePreview();
+}
+BIBLES.forEach((b,i)=>{const option=document.createElement('option');option.value=i;option.textContent=b.name;$('bible-version').append(option)});
+$('bible-version').onchange=()=>{bibleIndex=+$('bible-version').value;if(!bible().books[bibleBook])bibleBook=Object.keys(bible().books)[0];chooseBook(bibleBook)};
+$('bible-tab').onclick=()=>{document.body.classList.add('bible-mode');$('bible-tab').className='active';$('service-tab').className='';renderBible()};
+$('service-tab').onclick=()=>{document.body.classList.remove('bible-mode');$('service-tab').className='active';$('bible-tab').className='';preview();send()};
+function queueBible(live){const obj=makeBibleItem();service.push(obj);refreshItems();previewIndex=service.length-1;previewSlide=0;preview();if(live){state={item:previewIndex,slide:0,blank:false};send()}else $('bible-status').textContent='Added to service: '+obj.title}
+$('bible-live').onclick=()=>queueBible(true);$('bible-add').onclick=()=>queueBible(false);$('bible-prev').onclick=()=>move(-1);$('bible-next').onclick=()=>move(1);$('bible-blank').onclick=()=>{state.blank=!state.blank;send()};
+$('bible-find').onclick=()=>{
+ const m=$('bible-ref').value.match(/^\s*(.+?)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?\s*$/);if(!m){$('bible-status').textContent='Use a reference such as John 3:16-18';return}
+ const norm=t=>t.toLowerCase().replace(/[^a-z0-9]/g,'');let key=norm(m[1]);if(key==='psalm')key='psalms';if(key==='songofsongs')key='songofsolomon';let matches=Object.keys(bible().books).filter(b=>norm(b)===key);if(!matches.length)matches=Object.keys(bible().books).filter(b=>norm(b).startsWith(key));
+ const ch=String(+m[2]),start=+m[3],end=+(m[4]||m[3]);if(matches.length!==1||end<start||end-start>175){$('bible-status').textContent='Book or verse range is invalid or ambiguous.';return}
+ const vs=bible().books[matches[0]][ch];if(!vs){$('bible-status').textContent='Chapter unavailable.';return}const ns=Array.from({length:end-start+1},(_,i)=>i+start);if(ns.some(n=>!vs[n])){$('bible-status').textContent='Verse range unavailable.';return}bibleBook=matches[0];bibleChapter=ch;bibleSelected=ns;renderBible();$('bible-status').textContent='Passage ready in preview.';
+};
+$('bible-ref').addEventListener('keydown',e=>{if(e.key==='Enter'){$('bible-find').click();e.stopPropagation()}});
+$('bible-search-go').onclick=()=>{const q=$('bible-search').value.trim().toLowerCase();$('bible-results').replaceChildren();if(!q)return;let count=0;for(const [book,chapters] of Object.entries(bible().books)){for(const [ch,verses] of Object.entries(chapters)){for(const [v,text] of Object.entries(verses)){if(text.toLowerCase().includes(q)&&count++<40){const el=document.createElement('button');el.textContent=`${book} ${ch}:${v} — ${text.slice(0,120)}`;el.onclick=()=>{bibleBook=book;bibleChapter=ch;bibleSelected=[+v];renderBible()};$('bible-results').append(el)}}}}const total=document.createElement('p');total.textContent=`${count} matches · up to 40 shown`;$('bible-results').prepend(total)};
+renderBible();
+</script></body></html>
